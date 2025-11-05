@@ -10,19 +10,31 @@
   .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;box-sizing:border-box;flex-direction:column;gap:22px}
   .title{font-size:42px;font-weight:900;letter-spacing:1px;color:#e8edf7;text-shadow:0 4px 20px rgba(0,0,0,.45)}
   .stage{background:linear-gradient(180deg,#081226 0%, #0f1a2b 100%);border-radius:14px;padding:28px;box-shadow:0 10px 30px rgba(2,6,23,0.6);display:flex;align-items:center;gap:18px}
-  .panel{width:520px;height:160px;border-radius:10px;background:linear-gradient(180deg,#071a2b,#052036);display:flex;align-items:center;justify-content:center;padding:18px 20px;box-sizing:border-box;position:relative;overflow:hidden}
+
+  /* 패널 */
+  .panel{width:520px;border-radius:10px;background:linear-gradient(180deg,#071a2b,#052036);display:flex;align-items:center;justify-content:center;padding:18px 20px;box-sizing:border-box;position:relative;overflow:hidden}
   .panel:before{content:"";position:absolute;inset:0;border-radius:10px;box-shadow:inset 0 6px 30px rgba(0,0,0,0.6)}
-  .display{display:flex;gap:10px;align-items:flex-end;z-index:2}
-  .wheel{width:120px;height:120px;background:linear-gradient(180deg,#0a2736,#06202c);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;border:2px solid rgba(255,255,255,0.03)}
+  .display{display:flex;gap:10px;align-items:center;z-index:2}
+
+  /* 휠 – 높이는 JS가 숫자 실측값으로 세팅해서 1칸만 보이게 함 */
+  .wheel{
+    width:120px; background:linear-gradient(180deg,#0a2736,#06202c);
+    border-radius:8px; display:flex; align-items:center; justify-content:center;
+    overflow:hidden; position:relative; border:2px solid rgba(255,255,255,0.03)
+  }
   .digit-strip{position:absolute;top:0;left:0;right:0;display:block;transform:translateY(0);will-change:transform}
   .digit{height:48px;line-height:48px;text-align:center;font-weight:800;font-size:44px;color:var(--accent);text-shadow:0 2px 8px rgba(0,0,0,0.6)}
   .label{position:absolute;left:10px;top:10px;color:var(--muted);font-size:12px}
+
   .controls{display:flex;flex-direction:column;gap:8px;margin-left:14px}
   .btn{background:transparent;border:1px solid rgba(255,255,255,0.08);padding:10px 18px;border-radius:10px;color:var(--text);cursor:pointer;font-weight:700}
   .btn.primary{background:var(--accent);color:#081022;border:0}
   .btn:active{transform:translateY(1px)}
   .small{font-size:13px;color:var(--muted)}
-  @media (max-width:640px){ .panel{width:100%;height:120px} .wheel{width:90px;height:96px} .digit{font-size:36px;height:44px;line-height:44px} .display{gap:6px} .title{font-size:30px} }
+  @media (max-width:640px){
+    .panel{width:100%} .wheel{width:90px} .digit{font-size:36px;height:44px;line-height:44px}
+    .title{font-size:30px}
+  }
   #fx{position:fixed;inset:0;pointer-events:none;z-index:50}
 </style>
 </head>
@@ -62,9 +74,10 @@
   const drawBtn = document.getElementById('drawBtn');
   const resetBtn = document.getElementById('resetBtn');
 
-  // ===== fireworks (3s each, 1.5s 간격 순차) =====
+  // ===== fireworks (3s each, 1s 간격 순차) =====
   const fx = document.getElementById('fx'); const ctx = fx.getContext('2d');
-  function resizeFx(){ fx.width = innerWidth; fx.height = innerHeight; } addEventListener('resize', resizeFx); resizeFx();
+  function resizeFx(){ fx.width = innerWidth; fx.height = innerHeight; }
+  addEventListener('resize', resizeFx); resizeFx();
   function burst(cx, cy, count=140, duration=3000){
     const ps=[]; for(let i=0;i<count;i++){ const a=Math.random()*Math.PI*2, s=2+Math.random()*5;
       ps.push({x:cx,y:cy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:duration,size:2+Math.random()*3,col:`hsl(${~~(Math.random()*360)},90%,60%)`});
@@ -83,51 +96,62 @@
   function celebrate(){
     const r=document.getElementById('panel').getBoundingClientRect();
     const center=[r.left+r.width/2, r.top+r.height/2];
-    // 순차: 0ms, +1500ms, +3000ms
+    // 순차: 0ms, +1000ms, +2000ms
     burst(...center, 160, 3000);
-    setTimeout(()=>burst(innerWidth*0.25, innerHeight*0.35, 120, 3000), 1500);
-    setTimeout(()=>burst(innerWidth*0.75, innerHeight*0.35, 120, 3000), 3000);
+    setTimeout(()=>burst(innerWidth*0.25, innerHeight*0.35, 120, 3000), 1000);
+    setTimeout(()=>burst(innerWidth*0.75, innerHeight*0.35, 120, 3000), 2000);
   }
   // ===============================================
 
-  // 실제 숫자 높이
+  // 숫자 한 칸만 보이게: 실측 높이로 휠 높이 맞춤
   function digitHeight(){ return document.querySelector('.digit').getBoundingClientRect().height; }
+  function applyViewportHeight(){
+    const h = digitHeight();
+    wheels.forEach(w => { w.style.height = `${h}px`; }); // 1칸만 보이도록
+  }
 
   // 휠 구성: 백의 자리(0/1만), 나머지(0~9)
   function buildStrip(wheel){
     const strip = wheel.querySelector('.digit-strip'); strip.innerHTML='';
-    const isHundreds = wheel.dataset.pos === 'h';
-    const digits = isHundreds ? [0,1] : [0,1,2,3,4,5,6,7,8,9];
-    // 여러 반복으로 롤링 느낌
-    for(let r=0;r<8;r++){ for(const d of digits){ const el=document.createElement('div'); el.className='digit'; el.textContent=d; strip.appendChild(el); } }
+    const isH = wheel.dataset.pos === 'h';
+    const digits = isH ? [0,1] : [0,1,2,3,4,5,6,7,8,9];
+    for(let r=0;r<10;r++){ for(const d of digits){
+      const el=document.createElement('div'); el.className='digit'; el.textContent=d; strip.appendChild(el);
+    }}
   }
   wheels.forEach(buildStrip);
 
-  // 즉시 위치 고정
-  const VISIBLE_REP = 3;
-  const TARGET_REP  = 5;
+  // 인덱스 계산 유틸 (가시 반복 / 목표 반복)
+  const VISIBLE_REP = 4;
+  const TARGET_REP  = 6;
+  function wheelBase(wheel){ return (wheel.dataset.pos==='h'?2:10); }
+
   function setInstant(wheel, digit){
     const strip=wheel.querySelector('.digit-strip'); strip.style.transition='none';
-    const h=digitHeight(); const len=(wheel.dataset.pos==='h'?2:10);
+    const h=digitHeight(); const len=wheelBase(wheel);
     const idx = VISIBLE_REP*len + digit;
     strip.style.transform=`translate3d(0, ${-idx*h}px, 0)`;
   }
 
-  // 애니메이션
   function spinToDigit(wheel, digit, loops, duration){
     return new Promise(resolve=>{
-      const strip=wheel.querySelector('.digit-strip'); const h=digitHeight();
-      const len=(wheel.dataset.pos==='h'?2:10);
+      const strip=wheel.querySelector('.digit-strip');
+      const h=digitHeight(); const len=wheelBase(wheel);
       const totalIndex = TARGET_REP*len + digit;
       const translateY = -((loops*len) + totalIndex) * h;
-      strip.style.transition=`transform ${duration}ms cubic-bezier(.18,.82,.18,1)`;
+      strip.style.transition = `transform ${duration}ms cubic-bezier(.18,.82,.18,1)`;
       requestAnimationFrame(()=>{ strip.style.transform=`translate3d(0, ${translateY}px, 0)`; });
-      const onEnd=()=>{ strip.style.transition='none'; const idx=VISIBLE_REP*len + digit; strip.style.transform=`translate3d(0, ${-idx*h}px, 0)`; strip.removeEventListener('transitionend', onEnd); resolve(); };
+      const onEnd=()=>{ strip.style.transition='none';
+        // 최종 강제 정렬 (실측 높이 사용)
+        const idx=VISIBLE_REP*len + digit;
+        strip.style.transform=`translate3d(0, ${-idx*h}px, 0)`;
+        strip.removeEventListener('transitionend', onEnd);
+        resolve();
+      };
       strip.addEventListener('transitionend', onEnd);
     });
   }
 
-  // 분해(1..100)
   function split(n){ n=Math.max(1,Math.min(MAX,Math.round(n))); return [Math.floor(n/100), Math.floor((n%100)/10), n%10]; }
 
   let spinning=false;
@@ -136,7 +160,6 @@
     n=Math.max(1,Math.min(MAX,n));
     const [h,t,o]=split(n);
 
-    // 100이 아니면 h=0, 100이면 h=1 / tens, ones도 100이면 0으로 멈춤
     const targetH = (n===100?1:0);
     const targetT = (n===100?0:t);
     const targetO = (n===100?0:o);
@@ -147,7 +170,7 @@
 
     await Promise.all([pH,pT,pO]);
 
-    // 최종 강제 정렬(실측 높이 사용)
+    // 표시값과 결과 완전 동기화 (한 번 더 고정)
     setInstant(wheelH, targetH);
     setInstant(wheelT, targetT);
     setInstant(wheelO, targetO);
@@ -163,7 +186,12 @@
   drawBtn.addEventListener('click', ()=>{ if(spinning) return; drawBtn.disabled=true; resultText.textContent='...'; spinTo(randomDraw()); });
   resetBtn.addEventListener('click', ()=>{ setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0); resultText.textContent='—'; drawBtn.disabled=false; spinning=false; });
 
-  window.addEventListener('load', ()=>{ setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0); });
+  function init(){
+    applyViewportHeight();
+    setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0);
+  }
+  window.addEventListener('load', init);
+  window.addEventListener('resize', ()=>{ applyViewportHeight(); /* 높이가 바뀌면 위치 재고정 */ setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0); });
 })();
 </script>
 </body>
