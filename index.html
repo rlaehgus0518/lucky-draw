@@ -160,13 +160,16 @@
   const baseLen = 10;
   const VISIBLE_REP = 4;   // 가운데 정렬 기준 반복
   const TARGET_REP  = 20;  // 목표 기준 반복
-  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;  // 연출용 여분 회전수(항상 동일)
-  const MAX_TARGET_INDEX = STRIP_REP*baseLen - baseLen*2; // 끝 여유 2바퀴
+  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;    // 여분 회전수(항상 동일)
+  const MAX_TARGET_INDEX = STRIP_REP*baseLen - baseLen*2;
 
   // 중앙 인덱스: (digit - 1) 보정
   function visibleBaseIndex(digit){ return VISIBLE_REP*baseLen + (digit - 1); }
 
-  // ★ rAF 기반 애니메이션: 항상 duration(ms) 고정
+  // === EASING: 강한 감속(퀸트) ===
+  const easeOutQuint = t => 1 - Math.pow(1 - t, 5);
+
+  // ★ rAF 기반 감속 애니메이션
   function animateToIndex(wheel, endIndex, duration){
     return new Promise(res=>{
       const strip = wheel.querySelector('.digit-strip');
@@ -184,12 +187,12 @@
       const startT = performance.now();
 
       function frame(now){
-        const p = Math.min(1, (now - startT) / duration); // 0..1
-        // 선형(가장 일정한 체감 속도). 원하면 easeOut 사용 가능.
+        const raw = Math.min(1, (now - startT) / duration); // 0..1
+        const p = easeOutQuint(raw);                         // 감속
         const y = startY + (endY - startY) * p;
         strip.style.transition = 'none';
         strip.style.transform = `translate3d(0, ${y}px, 0)`;
-        if(p < 1) requestAnimationFrame(frame);
+        if(raw < 1) requestAnimationFrame(frame);
         else res();
       }
       requestAnimationFrame(frame);
@@ -220,7 +223,7 @@
     wheel.querySelectorAll('.digit').forEach(d=>d.classList.remove('current'));
     const raw = (TARGET_REP + extraLoops) * baseLen + (digit - 1);
     const targetIdx = Math.min(raw, MAX_TARGET_INDEX);
-    await animateToIndex(wheel, targetIdx, duration); // ★ rAF로 정확히 duration 소요
+    await animateToIndex(wheel, targetIdx, duration);   // 감속 애니메이션
     // 스냅 + 중앙 강조
     const strip=wheel.querySelector('.digit-strip');
     strip.style.transition='none';
