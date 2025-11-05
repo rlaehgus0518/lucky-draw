@@ -111,7 +111,7 @@
   function celebrate(){const r=document.getElementById('panel').getBoundingClientRect();burst(r.left+r.width/2,r.top+r.height/2,160,3000);setTimeout(()=>burst(innerWidth*0.25,innerHeight*0.35,120,3000),1000);setTimeout(()=>burst(innerWidth*0.75,innerHeight*0.35,120,3000),2000);}
 
   const digitHeight=()=>document.querySelector('.digit').getBoundingClientRect().height;
-  const STRIP_REP=40,TARGET_REP=20,baseLen=10,EXTRA_LOOPS=14,SPIN_MS=6000; // 회전 길이/시간 늘림
+  const STRIP_REP=40,TARGET_REP=20,baseLen=10,EXTRA_LOOPS=14,SPIN_MS=9000; // 회전 길이/시간 늘림
 
   function buildStrip(wheel){const s=wheel.querySelector('.digit-strip');s.innerHTML='';for(let r=0;r<STRIP_REP;r++){for(let d=0;d<10;d++){const e=document.createElement('div');e.className='digit';e.textContent=d;s.appendChild(e);}}}
   wheels.forEach(buildStrip);
@@ -152,3 +152,4 @@
 </script>
 </body>
 </html>
+
