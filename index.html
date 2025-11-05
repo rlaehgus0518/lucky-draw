@@ -39,9 +39,9 @@
   <div class="title">Lucky Draw</div>
   <div class="panel" id="panel">
     <div class="display">
-      <div class="wheel" data-pos="h"><div class="digit-strip"></div><div class="focus-frame"></div></div>
-      <div class="wheel" data-pos="t"><div class="digit-strip"></div><div class="focus-frame"></div></div>
-      <div class="wheel" data-pos="o"><div class="digit-strip"></div><div class="focus-frame"></div></div>
+      <div class="wheel"><div class="digit-strip"></div><div class="focus-frame"></div></div>
+      <div class="wheel"><div class="digit-strip"></div><div class="focus-frame"></div></div>
+      <div class="wheel"><div class="digit-strip"></div><div class="focus-frame"></div></div>
     </div>
   </div>
   <div class="actions">
@@ -53,6 +53,7 @@
 
 <script>
 (() => {
+  // ===== 기본 엘리먼트 =====
   const wheels=[...document.querySelectorAll('.wheel')];
   const [wheelH,wheelT,wheelO]=wheels;
   const drawBtn=document.getElementById('drawBtn');
@@ -61,7 +62,7 @@
 
   // ===== 폭죽 =====
   const fx=document.getElementById('fx'),ctx=fx.getContext('2d');
-  function resizeFx(){fx.width=innerWidth;fx.height=innerHeight;}addEventListener('resize',resizeFx);resizeFx();
+  function resizeFx(){fx.width=innerWidth;fx.height=innerHeight;} addEventListener('resize',resizeFx); resizeFx();
   function burst(x,y,count=120,dur=3000){const ps=[];for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=2+Math.random()*5;
     ps.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:dur,size:2+Math.random()*3,col:`hsl(${~~(Math.random()*360)},90%,60%)`});}
     const start=performance.now();function step(t){const dt=t-start;ctx.clearRect(0,0,fx.width,fx.height);
@@ -73,117 +74,100 @@
     setTimeout(()=>burst(innerWidth*0.25,innerHeight*0.35,120,3000),1000);
     setTimeout(()=>burst(innerWidth*0.75,innerHeight*0.35,120,3000),2000);}
 
-  // ===== 숫자 회전 =====
+  // ===== 숫자 스트립/뷰포트 =====
   const STRIP_REP=30, baseLen=10, EASE='cubic-bezier(.08,.72,.12,.99)';
-
-  function buildStrip(w){
-    const s=w.querySelector('.digit-strip'); s.innerHTML='';
-    for(let r=0;r<STRIP_REP;r++){ for(let d=0;d<10;d++){
-      const e=document.createElement('div'); e.className='digit'; e.textContent=d; s.appendChild(e);
-    }}
-  }
+  function buildStrip(w){const s=w.querySelector('.digit-strip');s.innerHTML='';for(let r=0;r<STRIP_REP;r++){for(let d=0;d<10;d++){const e=document.createElement('div');e.className='digit';e.textContent=d;s.appendChild(e);}}}
   wheels.forEach(buildStrip);
 
   const digitHeight=()=>document.querySelector('.digit').getBoundingClientRect().height;
+  function applyH(){const h=digitHeight();document.documentElement.style.setProperty('--digitH',`${h}px`);wheels.forEach(w=>w.style.height=`${h*3}px`);}
   const visibleBaseIndex=d=>4*baseLen+(d-1);
 
   function markCurrent(w){
-    const s=w.querySelector('.digit-strip'),c=w.getBoundingClientRect().top+w.getBoundingClientRect().height/2,ds=[...s.children];
-    let best=null,dst=1e9;
-    for(const d of ds){const r=d.getBoundingClientRect(),m=r.top+r.height/2,dist=Math.abs(m-c); if(dist<dst){dst=dist;best=d;} d.classList.remove('current');}
-    if(best)best.classList.add('current');
+    const s=w.querySelector('.digit-strip');
+    const center=w.getBoundingClientRect().top + w.getBoundingClientRect().height/2;
+    const ds=[...s.children]; let best=null,dist=1e9;
+    for(const d of ds){const r=d.getBoundingClientRect(),m=r.top+r.height/2;const dv=Math.abs(m-center);
+      if(dv<dist){dist=dv;best=d;} d.classList.remove('current');}
+    if(best) best.classList.add('current');
   }
 
-  // ✅ 휠 높이 설정(숫자 3칸 보이도록) — 이게 빠지면 ‘사라진 것처럼’ 보일 수 있음
-  function applyH(){
-    const h=digitHeight();
-    document.documentElement.style.setProperty('--digitH',`${h}px`);
-    wheels.forEach(w=>{ w.style.height=`${h*3}px`; });
-  }
-
-  // 시작 위치를 ‘0’에 즉시 스냅
-  function setInstant(w, digit=0){
+  function setInstant(w,digit=0){
     const s=w.querySelector('.digit-strip');
     s.style.transition='none';
     s.style.transform=`translate3d(0,${-visibleBaseIndex(digit)*digitHeight()}px,0)`;
     markCurrent(w);
   }
 
-  // transition 캐시/최적화 무력화: 0으로 되돌렸다가 30ms 후 새 transition 적용
-  async function moveToIndex(w,i,dur){
-    return new Promise(r=>{
+  // ===== 핵심: 매회 3초 고정 애니메이션 =====
+  // 1) transition 완전 제거 → 2) 강제 리플로우 → 3) 3000ms transition 재적용 → 4) 목표로 이동
+  function moveToIndex(w,index,duration){
+    return new Promise(resolve=>{
       const s=w.querySelector('.digit-strip');
+      // 완전 리셋
       s.style.transition='none';
-      // 현재 위치를 기준으로 리셋 (시각적으로 끊김 없도록)
-      const cur = getComputedStyle(s).transform;
-      if(cur==='none'){
-        s.style.transform='translate3d(0,0,0)';
-      }
-      void s.offsetWidth; // 리플로우
-      setTimeout(()=>{
-        s.style.transition=`transform ${dur}ms ${EASE}`;
-        requestAnimationFrame(()=> s.style.transform=`translate3d(0,${-i*digitHeight()}px,0)`);
-        s.addEventListener('transitionend',()=>r(),{once:true});
-      },30);
+      void s.offsetWidth; // reflow
+      // 3000ms 고정 적용
+      s.style.transition=`transform ${duration}ms ${EASE}`;
+      requestAnimationFrame(()=>{
+        s.style.transform=`translate3d(0,${-index*digitHeight()}px,0)`;
+      });
+      s.addEventListener('transitionend',()=>resolve(),{once:true});
     });
   }
 
   async function spinToDigit(w,dig,loops,dur){
     const s=w.querySelector('.digit-strip');
     w.querySelectorAll('.digit').forEach(d=>d.classList.remove('current'));
-    const idx=(loops*baseLen)+(dig-1);
-    await moveToIndex(w,idx,dur);
-    // 멈춘 뒤 가운데로 스냅
+    const idx=(loops*baseLen)+(dig-1);        // 충분히 도는 거리
+    await moveToIndex(w, idx, dur);           // ★ 항상 dur(3000ms) 사용
+    // 멈춘 뒤 중앙으로 스냅(transition 없음)
     s.style.transition='none';
     s.style.transform=`translate3d(0,${-visibleBaseIndex(dig)*digitHeight()}px,0)`;
     markCurrent(w);
   }
 
+  // 숫자 헬퍼
   function split(n){n=Math.max(1,Math.min(100,n));return[Math.floor(n/100),Math.floor((n%100)/10),n%10];}
   const pad3=n=>n===100?"100":String(n).padStart(3,'0');
 
-  // 각 자리 3초
-  const SPIN_H=3000,SPIN_T=3000,SPIN_O=3000;
-  // 충분히 도는 회전수(스트립 길이 대비 여유 많음)
-  const LOOPS_H=8,LOOPS_T=9,LOOPS_O=10;
+  // 각 자리 3초 고정
+  const SPIN_H=3000, SPIN_T=3000, SPIN_O=3000;
+  // 회전수(시각적으로 충분히 도는 느낌)
+  const LOOPS_H=8, LOOPS_T=9, LOOPS_O=10;
 
   let spinning=false;
   async function spinTo(n){
     if(spinning) return; spinning=true;
 
-    // 매 회차 시작 시: 휠 높이 보정 + transition 완전 초기화
+    // 매 회차 시작 시: 뷰포트 보정 + transition 초기화
     applyH();
     [wheelH,wheelT,wheelO].forEach(w=>{
       const s=w.querySelector('.digit-strip');
       s.style.transition='none';
-      // 현재 중앙 정렬 위치로 되돌려 시작 (시각적 점프 방지)
-      const digitEl = w.querySelector('.digit.current');
-      const digit = digitEl ? Number(digitEl.textContent) || 0 : 0;
-      s.style.transform=`translate3d(0,${-visibleBaseIndex(digit)*digitHeight()}px,0)`;
       void s.offsetWidth;
     });
 
-    n=Math.max(1,Math.min(100,n)); const [h,t,o]=split(n);
+    n=Math.max(1,Math.min(100,n));
+    const [h,t,o]=split(n);
     const H=(n===100?1:0), T=(n===100?0:t), O=(n===100?0:o);
 
-    // 백 → 십 → 일 순서로 각 3초
-    await spinToDigit(wheelH,H,LOOPS_H,SPIN_H);
-    await spinToDigit(wheelT,T,LOOPS_T,SPIN_T);
-    await spinToDigit(wheelO,O,LOOPS_O,SPIN_O);
+    // ★ 백(3초) → 십(3초) → 일(3초) 순서로 정확히 3초씩
+    await spinToDigit(wheelH, H, LOOPS_H, SPIN_H);
+    await spinToDigit(wheelT, T, LOOPS_T, SPIN_T);
+    await spinToDigit(wheelO, O, LOOPS_O, SPIN_O);
 
-    bigResult.textContent=pad3(n);
+    bigResult.textContent = pad3(n);
     celebrate();
     spinning=false; drawBtn.disabled=false;
   }
 
+  // 바인딩
   drawBtn.onclick=()=>{ if(spinning) return; drawBtn.disabled=true; bigResult.textContent='...'; spinTo(Math.floor(Math.random()*100)+1); };
   resetBtn.onclick=()=>{ [wheelH,wheelT,wheelO].forEach(w=>setInstant(w,0)); bigResult.textContent='—'; spinning=false; drawBtn.disabled=false; };
 
-  function init(){
-    // 1) 스트립 구성 → 2) 높이 측정/적용 → 3) 초기 위치 셋
-    applyH();
-    setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0);
-  }
+  // 초기화
+  function init(){ applyH(); setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0); }
   window.addEventListener('load', init);
   window.addEventListener('resize', ()=>{ applyH(); setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0); });
 })();
