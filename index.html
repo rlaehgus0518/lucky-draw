@@ -38,7 +38,7 @@
 
   .focus-frame{
     position:absolute;left:8px;right:8px;margin:auto;
-    top:0; bottom:0;                 /* ★ 중앙 고정 */
+    top:0; bottom:0;                 /* 중앙 고정 */
     height:calc(var(--digitH,48px));
     border:3px solid rgba(255,209,102,.9);border-radius:10px;
     box-shadow:0 0 16px rgba(255,209,102,.25),inset 0 0 8px rgba(255,209,102,.25);
@@ -135,10 +135,10 @@
   }
 
   /* ===== 유틸 ===== */
-  const digitHeight = () => Math.round(document.querySelector('.digit').getBoundingClientRect().height); // ★ 정수화
+  const digitHeight = () => Math.round(document.querySelector('.digit').getBoundingClientRect().height);
 
   // 긴 스트립(사라짐 방지)
-  const STRIP_REP = 40; // 40바퀴 분량
+  const STRIP_REP = 40;
   function buildStrip(wheel){
     const strip = wheel.querySelector('.digit-strip'); strip.innerHTML='';
     for(let r=0;r<STRIP_REP;r++){
@@ -160,25 +160,39 @@
   const baseLen = 10;
   const VISIBLE_REP = 4;   // 가운데 정렬 기준 반복
   const TARGET_REP  = 20;  // 목표 기준 반복
-  const EASE = 'cubic-bezier(.08,.72,.12,.99)';
-
-  // 각 자리 정확히 3초
-  const SPIN_DUR = 3000;           // ms
-  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;  // 여분 회전수(연출)
+  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;  // 연출용 여분 회전수(항상 동일)
   const MAX_TARGET_INDEX = STRIP_REP*baseLen - baseLen*2; // 끝 여유 2바퀴
 
-  // ★ 중앙 인덱스: (digit - 1) 보정
+  // 중앙 인덱스: (digit - 1) 보정
   function visibleBaseIndex(digit){ return VISIBLE_REP*baseLen + (digit - 1); }
 
-  // transitionend 신뢰 + fallback
-  function moveToIndex(wheel, index, duration){
+  // ★ rAF 기반 애니메이션: 항상 duration(ms) 고정
+  function animateToIndex(wheel, endIndex, duration){
     return new Promise(res=>{
-      const strip=wheel.querySelector('.digit-strip');
-      strip.style.transition = `transform ${duration}ms ${EASE}`;
-      requestAnimationFrame(()=>{ strip.style.transform=`translate3d(0, ${-index*digitHeight()}px, 0)`; });
-      const done=()=>{ strip.removeEventListener('transitionend', done); clearTimeout(fb); res(); };
-      const fb=setTimeout(done, duration+80);
-      strip.addEventListener('transitionend', done, {once:true});
+      const strip = wheel.querySelector('.digit-strip');
+      // 현재 Y(px)
+      const curMatrix = getComputedStyle(strip).transform;
+      let startY = 0;
+      if(curMatrix && curMatrix !== 'none'){
+        const m = curMatrix.match(/matrix\(([-0-9., ]+)\)/);
+        if(m){
+          const parts = m[1].split(',').map(v=>parseFloat(v.trim()));
+          startY = parts[5] || 0; // ty
+        }
+      }
+      const endY = -endIndex * digitHeight();
+      const startT = performance.now();
+
+      function frame(now){
+        const p = Math.min(1, (now - startT) / duration); // 0..1
+        // 선형(가장 일정한 체감 속도). 원하면 easeOut 사용 가능.
+        const y = startY + (endY - startY) * p;
+        strip.style.transition = 'none';
+        strip.style.transform = `translate3d(0, ${y}px, 0)`;
+        if(p < 1) requestAnimationFrame(frame);
+        else res();
+      }
+      requestAnimationFrame(frame);
     });
   }
 
@@ -204,9 +218,10 @@
 
   async function spinToDigit(wheel, digit, extraLoops, duration){
     wheel.querySelectorAll('.digit').forEach(d=>d.classList.remove('current'));
-    const raw = (TARGET_REP + extraLoops) * baseLen + (digit - 1);   // ★ 목표 인덱스도 동일 보정
+    const raw = (TARGET_REP + extraLoops) * baseLen + (digit - 1);
     const targetIdx = Math.min(raw, MAX_TARGET_INDEX);
-    await moveToIndex(wheel, targetIdx, duration);
+    await animateToIndex(wheel, targetIdx, duration); // ★ rAF로 정확히 duration 소요
+    // 스냅 + 중앙 강조
     const strip=wheel.querySelector('.digit-strip');
     strip.style.transition='none';
     strip.style.transform=`translate3d(0, ${-visibleBaseIndex(digit)*digitHeight()}px, 0)`;
@@ -233,6 +248,7 @@
   clearHistoryBtn.onclick=()=>{ history.length=0; renderHistory(); };
 
   // 메인 로직
+  const SPIN_DUR = 3000; // 각 자리 3초 (고정)
   let spinning=false;
   async function spinTo(n){
     if(spinning) return; spinning=true;
@@ -246,7 +262,7 @@
     const digitT = (n===100?0:t);
     const digitO = (n===100?0:o);
 
-    // ★ 순차 진행: 백(3초) → 십(3초) → 일(3초)
+    // 순차 진행: 백(3s) → 십(3s) → 일(3s)
     await spinToDigit(wheelH, digitH, EXTRA_H, SPIN_DUR);
     await spinToDigit(wheelT, digitT, EXTRA_T, SPIN_DUR);
     await spinToDigit(wheelO, digitO, EXTRA_O, SPIN_DUR);
