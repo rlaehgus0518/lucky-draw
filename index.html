@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>랜덤 추첨기 (1~100)</title>
+<style>
+  :root{
+    --bg:#0b1020;
+    --panel:#0f1724;
+    --accent:#ffd166;
+    --text:#f8fafc;
+    --muted:#99a0b2;
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Apple SD Gothic Neo,"Malgun Gothic",sans-serif;background:linear-gradient(180deg,#071023 0%, #07122a 60%);color:var(--text);}
+  .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;box-sizing:border-box;flex-direction:column;gap:22px}
+  .title{font-size:20px;letter-spacing:1px;color:var(--muted)}
+  .stage{background:linear-gradient(180deg,#081226 0%, #0f1a2b 100%);border-radius:14px;padding:28px 28px;box-shadow:0 10px 30px rgba(2,6,23,0.6);display:flex;align-items:center;gap:18px}
+  /* display panel */
+  .panel{width:520px;height:160px;border-radius:10px;background:linear-gradient(180deg,#071a2b,#052036);display:flex;align-items:center;justify-content:center;padding:18px 20px;box-sizing:border-box;position:relative;overflow:hidden}
+  .panel:before{content:"";position:absolute;inset:0;border-radius:10px;box-shadow:inset 0 6px 30px rgba(0,0,0,0.6)}
+  .display{display:flex;gap:10px;align-items:flex-end;z-index:2}
+  .wheel{
+    width:120px;height:120px;background:linear-gradient(180deg,#0a2736,#06202c);border-radius:8px;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;position:relative;border:2px solid rgba(255,255,255,0.03);
+  }
+  .digit-strip{position:absolute;top:0;left:0;right:0;display:block;transform:translateY(0)}
+  .digit{height:40px;line-height:40px;text-align:center;font-weight:700;font-size:40px;color:var(--accent);text-shadow:0 2px 8px rgba(0,0,0,0.6)}
+  .label{position:absolute;left:10px;top:10px;color:var(--muted);font-size:12px}
+  /* controls */
+  .controls{display:flex;flex-direction:column;gap:8px;margin-left:14px}
+  .btn{background:transparent;border:1px solid rgba(255,255,255,0.08);padding:10px 18px;border-radius:10px;color:var(--text);cursor:pointer;font-weight:600}
+  .btn.primary{background:var(--accent);color:#081022;border:0}
+  .btn:active{transform:translateY(1px)}
+  .small{font-size:13px;color:var(--muted)}
+  /* responsive */
+  @media (max-width:640px){
+    .panel{width:100%;height:120px}
+    .wheel{width:72px;height:96px}
+    .digit{font-size:28px;height:32px;line-height:32px}
+    .display{gap:6px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">랜덤 추첨기 • 숫자 범위: 1 ~ 100</div>
+
+  <div class="stage">
+    <div class="panel" id="panel">
+      <div class="display" id="display">
+        <!-- 3 wheels (hundreds, tens, ones) -->
+        <div class="wheel" data-pos="h">
+          <div class="label">100s</div>
+          <div class="digit-strip"></div>
+        </div>
+        <div class="wheel" data-pos="t">
+          <div class="label">10s</div>
+          <div class="digit-strip"></div>
+        </div>
+        <div class="wheel" data-pos="o">
+          <div class="label">1s</div>
+          <div class="digit-strip"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div style="display:flex;gap:8px">
+        <button class="btn primary" id="drawBtn">Draw</button>
+        <button class="btn" id="resetBtn">Reset</button>
+      </div>
+      <div class="small">결과: <span id="resultText">—</span></div>
+      <div class="small">옵션: 자동 시작 ? <input type="checkbox" id="autoStart"></div>
+      <div style="margin-top:6px;font-size:12px;color:var(--muted)">Tip: GitHub Pages/Netlify에 올리면 URL로 접속 가능합니다.</div>
+    </div>
+  </div>
+
+  <div style="font-size:12px;color:var(--muted);margin-top:6px">이미지 스타일의 대형 무대 화면 느낌을 CSS로 흉내냈습니다.</div>
+</div>
+
+<script>
+(() => {
+  const MAX = 100;               // 1 ~ MAX
+  const wheels = Array.from(document.querySelectorAll('.wheel'));
+  const resultText = document.getElementById('resultText');
+  const drawBtn = document.getElementById('drawBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const autoCheck = document.getElementById('autoStart');
+
+  // build digit lists: to allow smooth spinning we repeat 0-9 multiple times
+  function buildStrip(stripEl){
+    stripEl.innerHTML = '';
+    // repeat sequence 0..9 4 times -> enough for visual loops
+    for(let r=0;r<4;r++){
+      for(let d=0;d<10;d++){
+        const div = document.createElement('div');
+        div.className = 'digit';
+        div.textContent = d;
+        stripEl.appendChild(div);
+      }
+    }
+  }
+  wheels.forEach(w => buildStrip(w.querySelector('.digit-strip')));
+
+  // helper: get height of one digit (assumes all same)
+  function digitHeight(){
+    const d = document.querySelector('.digit');
+    return d ? d.getBoundingClientRect().height : 40;
+  }
+
+  // normalize number into 3 digits array (hundreds, tens, ones)
+  function splitNumber(n){
+    n = Math.max(1, Math.min(MAX, Math.round(n)));
+    const ones = n % 10;
+    const tens = Math.floor((n % 100) / 10);
+    const hundreds = Math.floor(n / 100); // 0 or 1 for MAX=100
+    return [hundreds, tens, ones];
+  }
+
+  // animate each wheel to target digit.
+  // we create a big translateY offset: (#loops * 10 + targetDigit) * h
+  function spinTo(targetNum){
+    const targets = splitNumber(targetNum);
+    const h = digitHeight();
+    // decide loops and durations to create staggered stop
+    const baseLoops = 3;
+    wheels.forEach((wheel, idx) => {
+      const strip = wheel.querySelector('.digit-strip');
+      // choose more loops for leftmost wheel to keep drama
+      const loops = baseLoops + (2 - idx); // leftmost more loops
+      const digit = targets[idx];
+      // target index inside repeated strip: pick middle repetition for better visuals
+      // We used 4 repeats => index = (repetitionIndex * 10) + digit
+      const repIndex = 2; // use repetition 2
+      const totalIndex = repIndex * 10 + digit;
+      const translateY = - ( (loops * 10) + totalIndex ) * h;
+
+      // set transition
+      const dur = 1800 + idx * 350 + Math.random()*300; // ms, staggered per wheel
+      strip.style.transition = `transform ${dur}ms cubic-bezier(.18,.82,.18,1)`;
+      // force reflow then set transform
+      requestAnimationFrame(() => {
+        strip.style.transform = `translateY(${translateY}px)`;
+      });
+
+      // on transition end -> normalize (jump back to same final digit inside the visible repeat)
+      const onEnd = () => {
+        strip.style.transition = 'none';
+        // compute visible repetition index (choose 1) and set transform so it shows the digit with no extra loops
+        const visibleRep = 1;
+        const finalIndex = visibleRep * 10 + digit;
+        const finalTranslate = - finalIndex * h;
+        strip.style.transform = `translateY(${finalTranslate}px)`;
+        strip.removeEventListener('transitionend', onEnd);
+      };
+      strip.addEventListener('transitionend', onEnd);
+    });
+
+    // show result text after the slowest duration
+    const maxDur = 1800 + 2 * 350 + 400;
+    setTimeout(() => {
+      resultText.textContent = String(targetNum);
+      drawBtn.disabled = false;
+    }, maxDur + 100);
+  }
+
+  function randomDraw(){
+    // uniform 1..MAX
+    const val = Math.floor(Math.random() * MAX) + 1;
+    return val;
+  }
+
+  // handle draw button
+  drawBtn.addEventListener('click', () => {
+    drawBtn.disabled = true;
+    resultText.textContent = '...';
+    const val = randomDraw();
+    spinTo(val);
+  });
+
+  resetBtn.addEventListener('click', () => {
+    // reset strips to show 0s (or 001)
+    wheels.forEach((wheel, idx) => {
+      const strip = wheel.querySelector('.digit-strip');
+      strip.style.transition = 'none';
+      const h = digitHeight();
+      // choose visible repetition 1 with digit 0 (or appropriate)
+      const digit = 0;
+      // set final transform
+      const visibleRep = 1;
+      const finalIndex = visibleRep * 10 + digit;
+      strip.style.transform = `translateY(${- finalIndex * h}px)`;
+    });
+    resultText.textContent = '—';
+    drawBtn.disabled = false;
+  });
+
+  // on load -> set initial positions to zeros
+  window.addEventListener('load', () => {
+    resetBtn.click();
+    // auto start if query '?auto=1' or checkbox is checked
+    const params = new URLSearchParams(location.search);
+    if(params.get('auto') === '1'){ setTimeout(() => drawBtn.click(), 300); autoCheck.checked = true; }
+    autoCheck.addEventListener('change', () => {
+      // if checked, add auto=1 to URL (for sharing)
+      const p = new URLSearchParams(location.search);
+      if(autoCheck.checked) p.set('auto','1'); else p.delete('auto');
+      const newUrl = location.pathname + '?' + p.toString();
+      history.replaceState(null,'', newUrl);
+    });
+  });
+
+  // make the panel clickable to Draw too
+  document.getElementById('panel').addEventListener('click', () => {
+    if(!drawBtn.disabled) drawBtn.click();
+  });
+
+  // accessibility: keyboard 'Enter' triggers draw
+  window.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' && !drawBtn.disabled) drawBtn.click();
+  });
+})();
+</script>
+</body>
+</html>
