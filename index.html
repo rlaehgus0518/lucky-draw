@@ -9,28 +9,43 @@
   html,body{height:100%;margin:0;font-family:Inter,system-ui,Apple SD Gothic Neo,"Malgun Gothic",sans-serif;background:#07122a;color:var(--text);}
   .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;box-sizing:border-box;flex-direction:column;gap:22px}
   .title{font-size:42px;font-weight:900;letter-spacing:1px;color:#e8edf7;text-shadow:0 4px 20px rgba(0,0,0,.45)}
-  .stage{background:linear-gradient(180deg,#081226 0%, #0f1a2b 100%);border-radius:14px;padding:28px;box-shadow:0 10px 30px rgba(2,6,23,0.6);display:flex;align-items:center;gap:18px}
+  .stage{background:linear-gradient(180deg,#081226 0%, #0f1a2b 100%);border-radius:14px;padding:28px;box-shadow:0 10px 30px rgba(2,6,23,0.6);display:flex;align-items:flex-start;gap:18px}
 
   /* 패널 */
   .panel{width:520px;border-radius:10px;background:linear-gradient(180deg,#071a2b,#052036);display:flex;align-items:center;justify-content:center;padding:18px 20px;box-sizing:border-box;position:relative;overflow:hidden}
   .panel:before{content:"";position:absolute;inset:0;border-radius:10px;box-shadow:inset 0 6px 30px rgba(0,0,0,0.6)}
   .display{display:flex;gap:10px;align-items:center;z-index:2}
 
-  /* 휠 – 높이는 JS가 숫자 실측값으로 세팅해서 1칸만 보이게 함 */
+  /* 휠: 이제 3칸(이전/현재/다음)이 보이도록 높이는 JS로 숫자높이*3 */
   .wheel{
-    width:120px; background:linear-gradient(180deg,#0a2736,#06202c);
-    border-radius:8px; display:flex; align-items:center; justify-content:center;
-    overflow:hidden; position:relative; border:2px solid rgba(255,255,255,0.03)
+    width:120px;background:linear-gradient(180deg,#0a2736,#06202c);
+    border-radius:8px;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;position:relative;border:2px solid rgba(255,255,255,0.03)
   }
   .digit-strip{position:absolute;top:0;left:0;right:0;display:block;transform:translateY(0);will-change:transform}
   .digit{height:48px;line-height:48px;text-align:center;font-weight:800;font-size:44px;color:var(--accent);text-shadow:0 2px 8px rgba(0,0,0,0.6)}
   .label{position:absolute;left:10px;top:10px;color:var(--muted);font-size:12px}
+  /* 가운데 줄에 시선이 가도록 상/하 페이드 */
+  .wheel::after, .wheel::before{
+    content:"";position:absolute;left:0;right:0;height:25%;pointer-events:none;
+  }
+  .wheel::before{top:0;background:linear-gradient(to bottom, rgba(7,18,42,.85), rgba(7,18,42,0))}
+  .wheel::after{bottom:0;background:linear-gradient(to top, rgba(7,18,42,.85), rgba(7,18,42,0))}
 
-  .controls{display:flex;flex-direction:column;gap:8px;margin-left:14px}
+  /* 우측 컨트롤 + 기록 */
+  .side{display:flex;flex-direction:column;gap:10px;min-width:180px}
   .btn{background:transparent;border:1px solid rgba(255,255,255,0.08);padding:10px 18px;border-radius:10px;color:var(--text);cursor:pointer;font-weight:700}
   .btn.primary{background:var(--accent);color:#081022;border:0}
   .btn:active{transform:translateY(1px)}
   .small{font-size:13px;color:var(--muted)}
+  .history{
+    margin-top:8px;background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);
+    border-radius:10px;padding:10px;max-height:180px;overflow:auto
+  }
+  .history h4{margin:0 0 6px 0;font-size:13px;color:#d7deef}
+  .list{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{background:rgba(255,255,255,.06);padding:4px 8px;border-radius:8px;font-size:12px}
+
   @media (max-width:640px){
     .panel{width:100%} .wheel{width:90px} .digit{font-size:36px;height:44px;line-height:44px}
     .title{font-size:30px}
@@ -53,12 +68,20 @@
       </div>
     </div>
 
-    <div class="controls">
+    <div class="side">
       <div style="display:flex;gap:8px">
         <button class="btn primary" id="drawBtn">추첨</button>
         <button class="btn" id="resetBtn">Reset</button>
       </div>
       <div class="small">결과: <span id="resultText">—</span></div>
+
+      <div class="history">
+        <h4>추첨 기록</h4>
+        <div class="list" id="historyList"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn" id="clearHistoryBtn" style="padding:6px 10px;font-size:12px">기록 비우기</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -73,6 +96,8 @@
   const resultText = document.getElementById('resultText');
   const drawBtn = document.getElementById('drawBtn');
   const resetBtn = document.getElementById('resetBtn');
+  const historyList = document.getElementById('historyList');
+  const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
   // ===== fireworks (3s each, 1s 간격 순차) =====
   const fx = document.getElementById('fx'); const ctx = fx.getContext('2d');
@@ -96,19 +121,15 @@
   function celebrate(){
     const r=document.getElementById('panel').getBoundingClientRect();
     const center=[r.left+r.width/2, r.top+r.height/2];
-    // 순차: 0ms, +1000ms, +2000ms
+    // 0ms, +1000ms, +2000ms
     burst(...center, 160, 3000);
     setTimeout(()=>burst(innerWidth*0.25, innerHeight*0.35, 120, 3000), 1000);
     setTimeout(()=>burst(innerWidth*0.75, innerHeight*0.35, 120, 3000), 2000);
   }
   // ===============================================
 
-  // 숫자 한 칸만 보이게: 실측 높이로 휠 높이 맞춤
+  // 숫자 실측 높이
   function digitHeight(){ return document.querySelector('.digit').getBoundingClientRect().height; }
-  function applyViewportHeight(){
-    const h = digitHeight();
-    wheels.forEach(w => { w.style.height = `${h}px`; }); // 1칸만 보이도록
-  }
 
   // 휠 구성: 백의 자리(0/1만), 나머지(0~9)
   function buildStrip(wheel){
@@ -121,30 +142,37 @@
   }
   wheels.forEach(buildStrip);
 
-  // 인덱스 계산 유틸 (가시 반복 / 목표 반복)
+  // 3칸 보기: 휠 높이를 숫자높이*3 으로
+  function applyViewportHeight(){
+    const h = digitHeight();
+    wheels.forEach(w => { w.style.height = `${h*3}px`; });
+  }
+
+  // 인덱스 계산 (가운데 줄=현재값 보이도록 idx-1 조정)
   const VISIBLE_REP = 4;
   const TARGET_REP  = 6;
-  function wheelBase(wheel){ return (wheel.dataset.pos==='h'?2:10); }
+  const baseLen = w => (w.dataset.pos==='h'?2:10);
 
   function setInstant(wheel, digit){
     const strip=wheel.querySelector('.digit-strip'); strip.style.transition='none';
-    const h=digitHeight(); const len=wheelBase(wheel);
+    const h=digitHeight(); const len=baseLen(wheel);
     const idx = VISIBLE_REP*len + digit;
-    strip.style.transform=`translate3d(0, ${-idx*h}px, 0)`;
+    const topIndex = idx - 1; // 가운데 줄이 현재값 → 위에 이전값 1칸 보이도록
+    strip.style.transform=`translate3d(0, ${-topIndex*h}px, 0)`;
   }
 
   function spinToDigit(wheel, digit, loops, duration){
     return new Promise(resolve=>{
       const strip=wheel.querySelector('.digit-strip');
-      const h=digitHeight(); const len=wheelBase(wheel);
-      const totalIndex = TARGET_REP*len + digit;
-      const translateY = -((loops*len) + totalIndex) * h;
+      const h=digitHeight(); const len=baseLen(wheel);
+      const idx = TARGET_REP*len + digit;
+      const topIndex = idx - 1;
+      const translateY = -((loops*len) + topIndex) * h;
       strip.style.transition = `transform ${duration}ms cubic-bezier(.18,.82,.18,1)`;
       requestAnimationFrame(()=>{ strip.style.transform=`translate3d(0, ${translateY}px, 0)`; });
       const onEnd=()=>{ strip.style.transition='none';
-        // 최종 강제 정렬 (실측 높이 사용)
-        const idx=VISIBLE_REP*len + digit;
-        strip.style.transform=`translate3d(0, ${-idx*h}px, 0)`;
+        const vIdx = VISIBLE_REP*len + digit; const vTop = vIdx - 1;
+        strip.style.transform=`translate3d(0, ${-vTop*h}px, 0)`;
         strip.removeEventListener('transitionend', onEnd);
         resolve();
       };
@@ -152,7 +180,26 @@
     });
   }
 
+  // 분해(1..100)
   function split(n){ n=Math.max(1,Math.min(MAX,Math.round(n))); return [Math.floor(n/100), Math.floor((n%100)/10), n%10]; }
+
+  // 기록
+  const history = [];
+  function pushHistory(n){
+    history.unshift(n);
+    if(history.length>50) history.pop();
+    renderHistory();
+  }
+  function renderHistory(){
+    historyList.innerHTML = '';
+    history.forEach(v=>{
+      const span=document.createElement('span');
+      span.className='tag';
+      span.textContent=String(v);
+      historyList.appendChild(span);
+    });
+  }
+  clearHistoryBtn.addEventListener('click', ()=>{ history.length=0; renderHistory(); });
 
   let spinning=false;
   async function spinTo(n){
@@ -170,12 +217,13 @@
 
     await Promise.all([pH,pT,pO]);
 
-    // 표시값과 결과 완전 동기화 (한 번 더 고정)
+    // 최종 정렬
     setInstant(wheelH, targetH);
     setInstant(wheelT, targetT);
     setInstant(wheelO, targetO);
 
     resultText.textContent=String(n);
+    pushHistory(n);
     celebrate();
     spinning=false; drawBtn.disabled=false;
   }
@@ -191,7 +239,7 @@
     setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0);
   }
   window.addEventListener('load', init);
-  window.addEventListener('resize', ()=>{ applyViewportHeight(); /* 높이가 바뀌면 위치 재고정 */ setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0); });
+  window.addEventListener('resize', ()=>{ applyViewportHeight(); setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0); });
 })();
 </script>
 </body>
