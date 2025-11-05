@@ -104,15 +104,16 @@
     for(const d of ds){const r=d.getBoundingClientRect(),m=r.top+r.height/2,dist=Math.abs(m-c);if(dist<dst){dst=dist;best=d;}d.classList.remove('current');}
     if(best)best.classList.add('current');}
 
-  async function moveToIndex(w,i,dur){return new Promise(r=>{
-    const s=w.querySelector('.digit-strip');
-    // 🔹 transition 초기화 (다음 회차 시 항상 동일)
-    s.style.transition='none';
-    void s.offsetWidth; // 강제 리플로우
-    s.style.transition=`transform ${dur}ms ${EASE}`;
-    requestAnimationFrame(()=>s.style.transform=`translate3d(0,${-i*digitHeight()}px,0)`);
-    s.addEventListener('transitionend',()=>r(),{once:true});
-  });}
+  async function moveToIndex(w,i,dur){
+    return new Promise(r=>{
+      const s=w.querySelector('.digit-strip');
+      s.style.transition='none';
+      void s.offsetWidth; // 강제 리플로우
+      s.style.transition=`transform ${dur}ms ${EASE}`;
+      requestAnimationFrame(()=>s.style.transform=`translate3d(0,${-i*digitHeight()}px,0)`);
+      s.addEventListener('transitionend',()=>r(),{once:true});
+    });
+  }
 
   async function spinToDigit(w,dig,loops,dur){
     const s=w.querySelector('.digit-strip');
@@ -136,6 +137,14 @@
   let spinning=false;
   async function spinTo(n){
     if(spinning)return;spinning=true;
+
+    // 회차별 transition 완전 초기화
+    [wheelH,wheelT,wheelO].forEach(w=>{
+      const s=w.querySelector('.digit-strip');
+      s.style.transition='none';
+      void s.offsetWidth;
+    });
+
     n=Math.max(1,Math.min(100,n));const[h,t,o]=split(n);
     const H=n===100?1:0,T=n===100?0:t,O=n===100?0:o;
     await spinToDigit(wheelH,H,LOOPS_H,SPIN_H);
