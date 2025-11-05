@@ -16,18 +16,19 @@
   .wheel{width:120px;background:linear-gradient(180deg,#0a2736,#06202c);
     border-radius:10px;display:flex;align-items:center;justify-content:center;
     overflow:hidden;position:relative;border:2px solid rgba(255,255,255,0.04)}
-  .digit-strip{position:absolute;top:0;left:0;right:0;display:block;transform:translateY(0);will-change:transform;}
+  .digit-strip{position:absolute;top:0;left:0;right:0;display:block;transform:translateY(0);will-change:transform;backface-visibility:hidden;}
   .digit{height:48px;line-height:48px;text-align:center;font-weight:800;font-size:44px;color:var(--accent);
     text-shadow:0 2px 8px rgba(0,0,0,0.6);transition:transform 120ms ease-out;}
   .digit.current{transform:scale(1.3);font-weight:1000;}
   .wheel::before,.wheel::after{content:"";position:absolute;left:0;right:0;height:28%;pointer-events:none}
   .wheel::before{top:0;background:linear-gradient(to bottom,rgba(7,18,42,.85),rgba(7,18,42,0))}
   .wheel::after{bottom:0;background:linear-gradient(to top,rgba(7,18,42,.85),rgba(7,18,42,0))}
-  .focus-frame{position:absolute;left:8px;right:8px;margin:auto;height:48px;border:3px solid rgba(255,209,102,.9);
+  .focus-frame{position:absolute;left:8px;right:8px;margin:auto;height:calc(var(--digitH,48px));border:3px solid rgba(255,209,102,.9);
     border-radius:10px;box-shadow:0 0 16px rgba(255,209,102,.25),inset 0 0 8px rgba(255,209,102,.25);pointer-events:none;}
   .actions{display:flex;gap:10px}
   .btn{background:transparent;border:1px solid rgba(255,255,255,0.08);padding:12px 18px;border-radius:12px;color:#fff;cursor:pointer;font-weight:800}
   .btn.primary{background:var(--accent);color:#081022;border:0}
+  .btn:active{transform:translateY(1px)}
   .big-result{font-size:112px;font-weight:1000;letter-spacing:4px;color:#ffe08a;text-shadow:0 6px 24px rgba(0,0,0,.5)}
   #fx{position:fixed;inset:0;pointer-events:none;z-index:50}
 </style>
@@ -58,7 +59,7 @@
   const resetBtn=document.getElementById('resetBtn');
   const bigResult=document.getElementById('bigResult');
 
-  // 폭죽
+  // ===== 폭죽 =====
   const fx=document.getElementById('fx'),ctx=fx.getContext('2d');
   function resizeFx(){fx.width=innerWidth;fx.height=innerHeight;}addEventListener('resize',resizeFx);resizeFx();
   function burst(x,y,count=120,dur=3000){const ps=[];for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=2+Math.random()*5;
@@ -72,35 +73,67 @@
     setTimeout(()=>burst(innerWidth*0.25,innerHeight*0.35,120,3000),1000);
     setTimeout(()=>burst(innerWidth*0.75,innerHeight*0.35,120,3000),2000);}
 
-  // 회전 구성
-  const STRIP_REP=30,baseLen=10,EASE='cubic-bezier(.08,.72,.12,.99)';
-  function buildStrip(w){const s=w.querySelector('.digit-strip');s.innerHTML='';for(let r=0;r<STRIP_REP;r++){for(let d=0;d<10;d++){const e=document.createElement('div');e.className='digit';e.textContent=d;s.appendChild(e);}}}
+  // ===== 숫자 회전 =====
+  const STRIP_REP=30, baseLen=10, EASE='cubic-bezier(.08,.72,.12,.99)';
+
+  function buildStrip(w){
+    const s=w.querySelector('.digit-strip'); s.innerHTML='';
+    for(let r=0;r<STRIP_REP;r++){ for(let d=0;d<10;d++){
+      const e=document.createElement('div'); e.className='digit'; e.textContent=d; s.appendChild(e);
+    }}
+  }
   wheels.forEach(buildStrip);
+
   const digitHeight=()=>document.querySelector('.digit').getBoundingClientRect().height;
   const visibleBaseIndex=d=>4*baseLen+(d-1);
-  function markCurrent(w){const s=w.querySelector('.digit-strip'),c=w.getBoundingClientRect().top+w.getBoundingClientRect().height/2,ds=[...s.children];
-    let best=null,dst=1e9;for(const d of ds){const r=d.getBoundingClientRect(),m=r.top+r.height/2,dist=Math.abs(m-c);
-      if(dist<dst){dst=dist;best=d;}d.classList.remove('current');}if(best)best.classList.add('current');}
 
-  // 애니메이션
+  function markCurrent(w){
+    const s=w.querySelector('.digit-strip'),c=w.getBoundingClientRect().top+w.getBoundingClientRect().height/2,ds=[...s.children];
+    let best=null,dst=1e9;
+    for(const d of ds){const r=d.getBoundingClientRect(),m=r.top+r.height/2,dist=Math.abs(m-c); if(dist<dst){dst=dist;best=d;} d.classList.remove('current');}
+    if(best)best.classList.add('current');
+  }
+
+  // ✅ 휠 높이 설정(숫자 3칸 보이도록) — 이게 빠지면 ‘사라진 것처럼’ 보일 수 있음
+  function applyH(){
+    const h=digitHeight();
+    document.documentElement.style.setProperty('--digitH',`${h}px`);
+    wheels.forEach(w=>{ w.style.height=`${h*3}px`; });
+  }
+
+  // 시작 위치를 ‘0’에 즉시 스냅
+  function setInstant(w, digit=0){
+    const s=w.querySelector('.digit-strip');
+    s.style.transition='none';
+    s.style.transform=`translate3d(0,${-visibleBaseIndex(digit)*digitHeight()}px,0)`;
+    markCurrent(w);
+  }
+
+  // transition 캐시/최적화 무력화: 0으로 되돌렸다가 30ms 후 새 transition 적용
   async function moveToIndex(w,i,dur){
     return new Promise(r=>{
       const s=w.querySelector('.digit-strip');
       s.style.transition='none';
-      s.style.transform='translate3d(0,0,0)';
-      void s.offsetWidth;
+      // 현재 위치를 기준으로 리셋 (시각적으로 끊김 없도록)
+      const cur = getComputedStyle(s).transform;
+      if(cur==='none'){
+        s.style.transform='translate3d(0,0,0)';
+      }
+      void s.offsetWidth; // 리플로우
       setTimeout(()=>{
         s.style.transition=`transform ${dur}ms ${EASE}`;
-        requestAnimationFrame(()=>s.style.transform=`translate3d(0,${-i*digitHeight()}px,0)`);
+        requestAnimationFrame(()=> s.style.transform=`translate3d(0,${-i*digitHeight()}px,0)`);
         s.addEventListener('transitionend',()=>r(),{once:true});
       },30);
     });
   }
+
   async function spinToDigit(w,dig,loops,dur){
     const s=w.querySelector('.digit-strip');
     w.querySelectorAll('.digit').forEach(d=>d.classList.remove('current'));
     const idx=(loops*baseLen)+(dig-1);
     await moveToIndex(w,idx,dur);
+    // 멈춘 뒤 가운데로 스냅
     s.style.transition='none';
     s.style.transform=`translate3d(0,${-visibleBaseIndex(dig)*digitHeight()}px,0)`;
     markCurrent(w);
@@ -108,24 +141,51 @@
 
   function split(n){n=Math.max(1,Math.min(100,n));return[Math.floor(n/100),Math.floor((n%100)/10),n%10];}
   const pad3=n=>n===100?"100":String(n).padStart(3,'0');
+
+  // 각 자리 3초
   const SPIN_H=3000,SPIN_T=3000,SPIN_O=3000;
+  // 충분히 도는 회전수(스트립 길이 대비 여유 많음)
   const LOOPS_H=8,LOOPS_T=9,LOOPS_O=10;
 
   let spinning=false;
   async function spinTo(n){
-    if(spinning)return;spinning=true;
-    [wheelH,wheelT,wheelO].forEach(w=>{const s=w.querySelector('.digit-strip');s.style.transition='none';s.style.transform='translate3d(0,0,0)';});
-    n=Math.max(1,Math.min(100,n));const[h,t,o]=split(n);
-    const H=n===100?1:0,T=n===100?0:t,O=n===100?0:o;
+    if(spinning) return; spinning=true;
+
+    // 매 회차 시작 시: 휠 높이 보정 + transition 완전 초기화
+    applyH();
+    [wheelH,wheelT,wheelO].forEach(w=>{
+      const s=w.querySelector('.digit-strip');
+      s.style.transition='none';
+      // 현재 중앙 정렬 위치로 되돌려 시작 (시각적 점프 방지)
+      const digitEl = w.querySelector('.digit.current');
+      const digit = digitEl ? Number(digitEl.textContent) || 0 : 0;
+      s.style.transform=`translate3d(0,${-visibleBaseIndex(digit)*digitHeight()}px,0)`;
+      void s.offsetWidth;
+    });
+
+    n=Math.max(1,Math.min(100,n)); const [h,t,o]=split(n);
+    const H=(n===100?1:0), T=(n===100?0:t), O=(n===100?0:o);
+
+    // 백 → 십 → 일 순서로 각 3초
     await spinToDigit(wheelH,H,LOOPS_H,SPIN_H);
     await spinToDigit(wheelT,T,LOOPS_T,SPIN_T);
     await spinToDigit(wheelO,O,LOOPS_O,SPIN_O);
-    bigResult.textContent=pad3(n);celebrate();
-    spinning=false;drawBtn.disabled=false;
+
+    bigResult.textContent=pad3(n);
+    celebrate();
+    spinning=false; drawBtn.disabled=false;
   }
 
-  drawBtn.onclick=()=>{if(spinning)return;drawBtn.disabled=true;bigResult.textContent='...';spinTo(Math.floor(Math.random()*100)+1);};
-  resetBtn.onclick=()=>{[wheelH,wheelT,wheelO].forEach(w=>{const s=w.querySelector('.digit-strip');s.style.transition='none';s.style.transform='translate3d(0,0,0)';});bigResult.textContent='—';spinning=false;drawBtn.disabled=false;};
+  drawBtn.onclick=()=>{ if(spinning) return; drawBtn.disabled=true; bigResult.textContent='...'; spinTo(Math.floor(Math.random()*100)+1); };
+  resetBtn.onclick=()=>{ [wheelH,wheelT,wheelO].forEach(w=>setInstant(w,0)); bigResult.textContent='—'; spinning=false; drawBtn.disabled=false; };
+
+  function init(){
+    // 1) 스트립 구성 → 2) 높이 측정/적용 → 3) 초기 위치 셋
+    applyH();
+    setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0);
+  }
+  window.addEventListener('load', init);
+  window.addEventListener('resize', ()=>{ applyH(); setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0); });
 })();
 </script>
 </body>
