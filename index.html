@@ -161,9 +161,9 @@
   const TARGET_REP  = 20; // 목표 기준 반복
   const EASE = 'cubic-bezier(.08,.72,.12,.99)';
 
-  // ★ 바퀴별 회전 시간/회전 수(백 → 십 → 일 순서로 더 오래)
-  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;  // 추가 회전수
-  const SPIN_H  = 6000, SPIN_T = 7000, SPIN_O = 8000; // ms
+  // ★ 각 자리 정확히 3초
+  const SPIN_DUR = 3000;           // ms
+  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;  // 여분 회전수(연출용)
   const MAX_TARGET_INDEX = STRIP_REP*baseLen - baseLen*2; // 끝 여유 2바퀴
 
   function visibleBaseIndex(digit){ return VISIBLE_REP*baseLen + (digit - 1); }
@@ -173,7 +173,10 @@
       const strip=wheel.querySelector('.digit-strip');
       strip.style.transition = `transform ${duration}ms ${EASE}`;
       requestAnimationFrame(()=>{ strip.style.transform=`translate3d(0, ${-index*digitHeight()}px, 0)`; });
-      strip.addEventListener('transitionend', ()=>res(), {once:true});
+      // transitionend 누락 대비 안전망
+      const done=()=>{ strip.removeEventListener('transitionend', done); clearTimeout(fb); res(); };
+      const fb=setTimeout(done, duration+60);
+      strip.addEventListener('transitionend', done, {once:true});
     });
   }
 
@@ -198,13 +201,10 @@
   }
 
   async function spinToDigit(wheel, digit, extraLoops, duration){
-    // 스핀 중 current 해제
     wheel.querySelectorAll('.digit').forEach(d=>d.classList.remove('current'));
-    // 충분히 긴 목표 인덱스(끝 여유 확보)
     const raw = (TARGET_REP + extraLoops) * baseLen + (digit - 1);
     const targetIdx = Math.min(raw, MAX_TARGET_INDEX);
     await moveToIndex(wheel, targetIdx, duration);
-    // 재정렬 + 중앙 강조
     const strip=wheel.querySelector('.digit-strip');
     strip.style.transition='none';
     strip.style.transform=`translate3d(0, ${-visibleBaseIndex(digit)*digitHeight()}px, 0)`;
@@ -234,30 +234,31 @@
   let spinning=false;
   async function spinTo(n){
     if(spinning) return; spinning=true;
+    drawBtn.disabled=true;
+
     n=Math.max(1,Math.min(100,n));
     const [h,t,o]=split(n);
 
-    // 1..100 표현: 백의자리는 n==100 ? 1 : 0 에 멈춘다
+    // 1..100 표현: 백의자리는 n==100 ? 1 : 0
     const digitH = (n===100?1:0);
     const digitT = (n===100?0:t);
     const digitO = (n===100?0:o);
 
-    // ★ 백 → 십 → 일 순서로 더 오래 돌고 늦게 멈춤
-    await Promise.all([
-      spinToDigit(wheelH, digitH, EXTRA_H, SPIN_H),               // 먼저 멈춤
-      (async()=>{ await new Promise(r=>setTimeout(r,120)); await spinToDigit(wheelT, digitT, EXTRA_T, SPIN_T); })(),
-      (async()=>{ await new Promise(r=>setTimeout(r,240)); await spinToDigit(wheelO, digitO, EXTRA_O, SPIN_O); })(),
-    ]);
+    // ★ 순차 진행: 백(3초) → 십(3초) → 일(3초)
+    await spinToDigit(wheelH, digitH, EXTRA_H, SPIN_DUR);
+    await spinToDigit(wheelT, digitT, EXTRA_T, SPIN_DUR);
+    await spinToDigit(wheelO, digitO, EXTRA_O, SPIN_DUR);
 
     bigResult.textContent = pad3(n);
     addHistory(n);
     celebrate();
+
     spinning=false; drawBtn.disabled=false;
   }
 
   // 바인딩
   document.getElementById('panel').onclick = () => { if(!drawBtn.disabled) drawBtn.click(); };
-  drawBtn.onclick = () => { if(spinning) return; drawBtn.disabled=true; bigResult.textContent='...'; spinTo(randomDraw()); };
+  drawBtn.onclick = () => { if(spinning) return; bigResult.textContent='...'; spinTo(randomDraw()); };
   resetBtn.onclick = () => { [wheelH,wheelT,wheelO].forEach(w=>setInstant(w,0)); bigResult.textContent='—'; spinning=false; drawBtn.disabled=false; };
 
   // 초기화
