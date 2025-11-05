@@ -11,16 +11,11 @@
   .title{font-size:128px;font-weight:1000;letter-spacing:2px;color:#e8edf7;text-shadow:0 6px 26px rgba(0,0,0,.45)}
   .stage{width:100%;max-width:1200px;display:flex;justify-content:center;}
   .centerStack{display:flex;flex-direction:column;gap:18px;align-items:center}
-
   .panel{width:520px;max-width:90vw;border-radius:12px;background:linear-gradient(180deg,#071a2b,#052036);
     display:flex;align-items:center;justify-content:center;padding:18px 20px;box-sizing:border-box;overflow:hidden;
     box-shadow:0 10px 30px rgba(2,6,23,0.6)}
   .display{display:flex;gap:12px;align-items:center;z-index:2}
-  .wheel{
-    width:120px;background:linear-gradient(180deg,#0a2736,#06202c);
-    border-radius:10px;display:flex;align-items:center;justify-content:center;
-    overflow:hidden;position:relative;border:2px solid rgba(255,255,255,0.04)
-  }
+  .wheel{width:120px;background:linear-gradient(180deg,#0a2736,#06202c);border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;border:2px solid rgba(255,255,255,0.04)}
   .digit-strip{position:absolute;top:0;left:0;right:0;display:block;transform:translateY(0);will-change:transform;}
   .digit{height:48px;line-height:48px;text-align:center;font-weight:800;font-size:44px;color:var(--accent);text-shadow:0 2px 8px rgba(0,0,0,0.6);transition:transform 120ms ease-out;}
   .digit.current{transform:scale(1.3);font-weight:1000;}
@@ -38,7 +33,6 @@
   .big-result-wrap{width:520px;max-width:90vw;background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 16px}
   .big-result-title{text-align:center;color:#d7deef;margin:0 0 6px 0;font-size:13px}
   .big-result{text-align:center;font-size:112px;line-height:1;font-weight:1000;letter-spacing:4px;color:#ffe08a;text-shadow:0 6px 24px rgba(0,0,0,.5)}
-
   .historyDock{position:fixed;right:24px;top:170px;width:360px;background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px;backdrop-filter:blur(2px);box-shadow:0 10px 30px rgba(2,6,23,.6);}
   .rows{display:flex;flex-direction:column;gap:8px;overflow:auto;max-height:calc(var(--rowh)*6 + 16px);}
   .row{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.06);border-radius:10px;padding:10px 12px;font-size:20px;height:var(--rowh)}
@@ -86,16 +80,13 @@
         bigResult=document.getElementById('bigResult'),rowsEl=document.getElementById('historyRows'),
         clearHistoryBtn=document.getElementById('clearHistoryBtn');
 
-  // ===== 폭죽 효과 =====
+  // ===== 폭죽 =====
   const fx=document.getElementById('fx'),ctx=fx.getContext('2d');
   function resizeFx(){fx.width=innerWidth;fx.height=innerHeight;}addEventListener('resize',resizeFx);resizeFx();
   function burst(x,y,count=120,dur=3000){const ps=[];for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=2+Math.random()*5;ps.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:dur,size:2+Math.random()*3,col:`hsl(${~~(Math.random()*360)},90%,60%)`});}
-    const start=performance.now();
-    function step(t){const dt=t-start;ctx.clearRect(0,0,fx.width,fx.height);
-      for(const p of ps){p.vy+=0.02;p.vx*=0.995;p.vy*=0.995;p.x+=p.vx;p.y+=p.vy;
-        ctx.globalAlpha=Math.max(0,1-dt/p.life);ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();}
-      ctx.globalAlpha=1;if(dt<dur)requestAnimationFrame(step);}
-    requestAnimationFrame(step);}
+    const start=performance.now();function step(t){const dt=t-start;ctx.clearRect(0,0,fx.width,fx.height);
+      for(const p of ps){p.vy+=0.02;p.vx*=0.995;p.vy*=0.995;p.x+=p.vx;p.y+=p.vy;ctx.globalAlpha=Math.max(0,1-dt/p.life);ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();}
+      ctx.globalAlpha=1;if(dt<dur)requestAnimationFrame(step);}requestAnimationFrame(step);}
   function celebrate(){const r=document.getElementById('panel').getBoundingClientRect();
     burst(r.left+r.width/2,r.top+r.height/2,160,3000);
     setTimeout(()=>burst(innerWidth*0.25,innerHeight*0.35,120,3000),1000);
@@ -112,17 +103,33 @@
   function markCurrent(w){const s=w.querySelector('.digit-strip'),c=w.getBoundingClientRect().top+w.getBoundingClientRect().height/2,ds=[...s.children];let best=null,dst=1e9;
     for(const d of ds){const r=d.getBoundingClientRect(),m=r.top+r.height/2,dist=Math.abs(m-c);if(dist<dst){dst=dist;best=d;}d.classList.remove('current');}
     if(best)best.classList.add('current');}
-  async function moveToIndex(w,i,dur){return new Promise(r=>{const s=w.querySelector('.digit-strip');s.style.transition=`transform ${dur}ms ${EASE}`;requestAnimationFrame(()=>s.style.transform=`translate3d(0,${-i*digitHeight()}px,0)`);s.addEventListener('transitionend',()=>r(),{once:true});});}
-  async function spinToDigit(w,dig,loops,dur){const s=w.querySelector('.digit-strip');s.style.transition='none';w.querySelectorAll('.digit').forEach(d=>d.classList.remove('current'));
-    const idx=(loops*baseLen)+(dig-1);await moveToIndex(w,idx,dur);
-    s.style.transition='none';s.style.transform=`translate3d(0,${-visibleBaseIndex(dig)*digitHeight()}px,0)`;markCurrent(w);}
+
+  async function moveToIndex(w,i,dur){return new Promise(r=>{
+    const s=w.querySelector('.digit-strip');
+    // 🔹 transition 초기화 (다음 회차 시 항상 동일)
+    s.style.transition='none';
+    void s.offsetWidth; // 강제 리플로우
+    s.style.transition=`transform ${dur}ms ${EASE}`;
+    requestAnimationFrame(()=>s.style.transform=`translate3d(0,${-i*digitHeight()}px,0)`);
+    s.addEventListener('transitionend',()=>r(),{once:true});
+  });}
+
+  async function spinToDigit(w,dig,loops,dur){
+    const s=w.querySelector('.digit-strip');
+    w.querySelectorAll('.digit').forEach(d=>d.classList.remove('current'));
+    const idx=(loops*baseLen)+(dig-1);
+    await moveToIndex(w,idx,dur);
+    s.style.transition='none';
+    s.style.transform=`translate3d(0,${-visibleBaseIndex(dig)*digitHeight()}px,0)`;
+    markCurrent(w);
+  }
+
   function split(n){n=Math.max(1,Math.min(100,n));return[Math.floor(n/100),Math.floor((n%100)/10),n%10];}
   const pad3=n=>n===100?"100":String(n).padStart(3,'0');
   const history=[],renderHistory=()=>{rowsEl.innerHTML='';history.forEach((v,i)=>{const r=document.createElement('div');r.className='row';r.innerHTML=`<span>${v}</span><span class="idx">#${i+1}</span>`;rowsEl.appendChild(r);});rowsEl.scrollTop=rowsEl.scrollHeight;};
   const addHistory=n=>{history.push(n);if(history.length>300)history.shift();renderHistory();};
   clearHistoryBtn.onclick=()=>{history.length=0;renderHistory();};
 
-  // === 회전 시간 설정 (각 3초)
   const SPIN_H=3000,SPIN_T=3000,SPIN_O=3000;
   const LOOPS_H=8,LOOPS_T=9,LOOPS_O=10;
 
@@ -131,10 +138,11 @@
     if(spinning)return;spinning=true;
     n=Math.max(1,Math.min(100,n));const[h,t,o]=split(n);
     const H=n===100?1:0,T=n===100?0:t,O=n===100?0:o;
-    await spinToDigit(wheelH,H,LOOPS_H,SPIN_H);        // 백자리
-    await spinToDigit(wheelT,T,LOOPS_T,SPIN_T);        // 십자리
-    await spinToDigit(wheelO,O,LOOPS_O,SPIN_O);        // 일자리
-    bigResult.textContent=pad3(n);addHistory(n);celebrate();spinning=false;drawBtn.disabled=false;
+    await spinToDigit(wheelH,H,LOOPS_H,SPIN_H);
+    await spinToDigit(wheelT,T,LOOPS_T,SPIN_T);
+    await spinToDigit(wheelO,O,LOOPS_O,SPIN_O);
+    bigResult.textContent=pad3(n);addHistory(n);celebrate();
+    spinning=false;drawBtn.disabled=false;
   }
 
   document.getElementById('panel').onclick=()=>{if(!drawBtn.disabled)drawBtn.click();};
