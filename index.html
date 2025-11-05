@@ -137,7 +137,7 @@
   const digitHeight = () => document.querySelector('.digit').getBoundingClientRect().height;
 
   // 긴 스트립(사라짐 방지)
-  const STRIP_REP = 40; // 40바퀴 분량
+  const STRIP_REP = 40;
   function buildStrip(wheel){
     const strip = wheel.querySelector('.digit-strip'); strip.innerHTML='';
     for(let r=0;r<STRIP_REP;r++){
@@ -157,26 +157,27 @@
 
   // 회전/정지 파라미터
   const baseLen = 10;
-  const VISIBLE_REP = 4;  // 가운데 정렬 기준 반복
-  const TARGET_REP  = 20; // 목표 기준 반복
+  const VISIBLE_REP = 4;
+  const TARGET_REP  = 20;
   const EASE = 'cubic-bezier(.08,.72,.12,.99)';
 
-  // ★ 각 자리 정확히 3초
-  const SPIN_DUR = 3000;           // ms
-  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;  // 여분 회전수(연출용)
-  const MAX_TARGET_INDEX = STRIP_REP*baseLen - baseLen*2; // 끝 여유 2바퀴
+  // ★ 각 자리 정확히 3초 (타이머 기준)
+  const SPIN_DUR = 3000;
+  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;
+  const MAX_TARGET_INDEX = STRIP_REP*baseLen - baseLen*2;
 
-  function visibleBaseIndex(digit){ return VISIBLE_REP*baseLen + (digit - 1); }
+  // ★ 중앙 인덱스: digit 그대로(오프바이원 제거)
+  function visibleBaseIndex(digit){ return VISIBLE_REP*baseLen + digit; }
 
+  // ★ transitionend에 의존하지 않고 정확히 duration만큼 대기
   function moveToIndex(wheel, index, duration){
     return new Promise(res=>{
       const strip=wheel.querySelector('.digit-strip');
       strip.style.transition = `transform ${duration}ms ${EASE}`;
-      requestAnimationFrame(()=>{ strip.style.transform=`translate3d(0, ${-index*digitHeight()}px, 0)`; });
-      // transitionend 누락 대비 안전망
-      const done=()=>{ strip.removeEventListener('transitionend', done); clearTimeout(fb); res(); };
-      const fb=setTimeout(done, duration+60);
-      strip.addEventListener('transitionend', done, {once:true});
+      requestAnimationFrame(()=>{
+        strip.style.transform=`translate3d(0, ${-index*digitHeight()}px, 0)`;
+      });
+      setTimeout(res, duration); // 정확히 duration 대기
     });
   }
 
@@ -202,7 +203,7 @@
 
   async function spinToDigit(wheel, digit, extraLoops, duration){
     wheel.querySelectorAll('.digit').forEach(d=>d.classList.remove('current'));
-    const raw = (TARGET_REP + extraLoops) * baseLen + (digit - 1);
+    const raw = (TARGET_REP + extraLoops) * baseLen + digit; // ★ digit 그대로
     const targetIdx = Math.min(raw, MAX_TARGET_INDEX);
     await moveToIndex(wheel, targetIdx, duration);
     const strip=wheel.querySelector('.digit-strip');
@@ -244,10 +245,10 @@
     const digitT = (n===100?0:t);
     const digitO = (n===100?0:o);
 
-    // ★ 순차 진행: 백(3초) → 십(3초) → 일(3초)
-    await spinToDigit(wheelH, digitH, EXTRA_H, SPIN_DUR);
-    await spinToDigit(wheelT, digitT, EXTRA_T, SPIN_DUR);
-    await spinToDigit(wheelO, digitO, EXTRA_O, SPIN_DUR);
+    // ★ 완전 순차: 각 자리 정확히 3초
+    await spinToDigit(wheelH, digitH, EXTRA_H, SPIN_DUR); // 3s
+    await spinToDigit(wheelT, digitT, EXTRA_T, SPIN_DUR); // 3s
+    await spinToDigit(wheelO, digitO, EXTRA_O, SPIN_DUR); // 3s
 
     bigResult.textContent = pad3(n);
     addHistory(n);
