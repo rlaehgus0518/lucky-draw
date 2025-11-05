@@ -5,13 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Lucky Draw</title>
 <style>
-  :root{
-    --panel:#0f1724; --accent:#ffd166; --text:#f8fafc; --rowh:48px;
-  }
+  :root{ --panel:#0f1724; --accent:#ffd166; --text:#f8fafc; --rowh:48px; }
   html,body{height:100%;margin:0;font-family:Inter,system-ui,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:#07122a;color:var(--text);}
   .wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:22px;padding:32px;box-sizing:border-box}
   .title{font-size:128px;font-weight:1000;letter-spacing:2px;color:#e8edf7;text-shadow:0 6px 26px rgba(0,0,0,.45)}
-
   .stage{width:100%;max-width:1200px;display:flex;justify-content:center;}
   .centerStack{display:flex;flex-direction:column;gap:18px;align-items:center}
 
@@ -19,7 +16,6 @@
     display:flex;align-items:center;justify-content:center;padding:18px 20px;box-sizing:border-box;overflow:hidden;
     box-shadow:0 10px 30px rgba(2,6,23,0.6)}
   .display{display:flex;gap:12px;align-items:center;z-index:2}
-
   .wheel{
     width:120px;background:linear-gradient(180deg,#0a2736,#06202c);
     border-radius:10px;display:flex;align-items:center;justify-content:center;
@@ -99,57 +95,176 @@
     <div class="clear-line"><button class="clear" id="clearHistoryBtn">기록 비우기</button></div>
   </aside>
 </div>
+
 <script>
 (() => {
-  const wheels=[...document.querySelectorAll('.wheel')];
-  const wheelH=wheels[0],wheelT=wheels[1],wheelO=wheels[2];
-  const drawBtn=document.getElementById('drawBtn'),resetBtn=document.getElementById('resetBtn'),bigResult=document.getElementById('bigResult'),rowsEl=document.getElementById('historyRows'),clearHistoryBtn=document.getElementById('clearHistoryBtn');
+  /* ===== 기본 요소 ===== */
+  const wheels = [...document.querySelectorAll('.wheel')];
+  const wheelH = wheels[0], wheelT = wheels[1], wheelO = wheels[2];
+  const drawBtn = document.getElementById('drawBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const bigResult = document.getElementById('bigResult');
+  const rowsEl = document.getElementById('historyRows');
+  const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
-  const fx=document.getElementById('fx'),ctx=fx.getContext('2d');
-  function resizeFx(){fx.width=innerWidth;fx.height=innerHeight;}addEventListener('resize',resizeFx);resizeFx();
-  function burst(x,y,count=140,dur=3000){const ps=[];for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=2+Math.random()*5;ps.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:dur,size:2+Math.random()*3,col:`hsl(${~~(Math.random()*360)},90%,60%)`});}const start=performance.now();function step(t){const dt=t-start;ctx.clearRect(0,0,fx.width,fx.height);for(const p of ps){p.vy+=0.02;p.vx*=0.995;p.vy*=0.995;p.x+=p.vx;p.y+=p.vy;ctx.globalAlpha=Math.max(0,1-dt/p.life);ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;if(dt<dur)requestAnimationFrame(step);}requestAnimationFrame(step);}
-  function celebrate(){const r=document.getElementById('panel').getBoundingClientRect();burst(r.left+r.width/2,r.top+r.height/2,160,3000);setTimeout(()=>burst(innerWidth*0.25,innerHeight*0.35,120,3000),1000);setTimeout(()=>burst(innerWidth*0.75,innerHeight*0.35,120,3000),2000);}
-
-  const digitHeight=()=>document.querySelector('.digit').getBoundingClientRect().height;
-  const STRIP_REP=40,TARGET_REP=20,baseLen=10,EXTRA_LOOPS=14,SPIN_MS=9000; // 회전 길이/시간 늘림
-
-  function buildStrip(wheel){const s=wheel.querySelector('.digit-strip');s.innerHTML='';for(let r=0;r<STRIP_REP;r++){for(let d=0;d<10;d++){const e=document.createElement('div');e.className='digit';e.textContent=d;s.appendChild(e);}}}
-  wheels.forEach(buildStrip);
-  function applyH(){const h=digitHeight();document.documentElement.style.setProperty('--digitH',`${h}px`);wheels.forEach(w=>w.style.height=`${h*3}px`);}
-  const EASE='cubic-bezier(.08,.72,.12,.99)';
-  const visibleBaseIndex=d=>4*baseLen+(d-1);
-  async function moveToIndex(w,i,dur){return new Promise(r=>{const s=w.querySelector('.digit-strip');s.style.transition=`transform ${dur}ms ${EASE}`;requestAnimationFrame(()=>s.style.transform=`translate3d(0,${-i*digitHeight()}px,0)`);s.addEventListener('transitionend',()=>r(),{once:true});});}
-  function markCurrent(w){const s=w.querySelector('.digit-strip');const center=w.getBoundingClientRect().top+w.getBoundingClientRect().height/2;const ds=[...s.children];let best=null,dist=1e9;for(const d of ds){const r=d.getBoundingClientRect(),m=r.top+r.height/2;if(Math.abs(m-center)<dist){dist=Math.abs(m-center);best=d;}d.classList.remove('current');}if(best)best.classList.add('current');}
-  async function spinToDigit(w,dig,extra,dur){w.querySelectorAll('.digit').forEach(d=>d.classList.remove('current'));const target=(TARGET_REP+extra)*baseLen+(dig-1);await moveToIndex(w,target,dur);const s=w.querySelector('.digit-strip');s.style.transition='none';s.style.transform=`translate3d(0,${-visibleBaseIndex(dig)*digitHeight()}px,0)`;markCurrent(w);}
-  function split(n){n=Math.max(1,Math.min(100,Math.round(n)));return[Math.floor(n/100),Math.floor((n%100)/10),n%10];}
-  function randomDraw(){return Math.floor(Math.random()*100)+1;}
-  const pad3=n=>n===100?"100":String(n).padStart(3,'0');
-  const history=[];function renderHistory(){rowsEl.innerHTML='';history.forEach((v,i)=>{const r=document.createElement('div');r.className='row';r.innerHTML=`<span>${v}</span><span class="idx">#${i+1}</span>`;rowsEl.appendChild(r);});rowsEl.scrollTop=rowsEl.scrollHeight;}
-  function addHistory(n){history.push(n);if(history.length>300)history.shift();renderHistory();}
-  clearHistoryBtn.onclick=()=>{history.length=0;renderHistory();};
-
-  let spinning=false;
-  async function spinTo(n){
-    if(spinning)return;spinning=true;
-    n=Math.max(1,Math.min(100,n));
-    const[h,t,o]=split(n);
-    const H=n===100?1:0,T=n===100?0:t,O=n===100?0:o;
-    await Promise.all([
-      spinToDigit(wheelH,H,EXTRA_LOOPS,SPIN_MS),
-      spinToDigit(wheelT,T,EXTRA_LOOPS,SPIN_MS),
-      spinToDigit(wheelO,O,EXTRA_LOOPS,SPIN_MS)
-    ]);
-    bigResult.textContent=pad3(n);addHistory(n);celebrate();spinning=false;drawBtn.disabled=false;
+  /* ===== 폭죽 ===== */
+  const fx = document.getElementById('fx'), ctx = fx.getContext('2d');
+  function resizeFx(){ fx.width = innerWidth; fx.height = innerHeight; }
+  addEventListener('resize', resizeFx); resizeFx();
+  function burst(x,y,count=140,dur=3000){
+    const ps=[]; for(let i=0;i<count;i++){ const a=Math.random()*Math.PI*2,s=2+Math.random()*5;
+      ps.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:dur,size:2+Math.random()*3,col:`hsl(${~~(Math.random()*360)},90%,60%)`});
+    }
+    const start=performance.now();
+    function step(t){
+      const dt=t-start; ctx.clearRect(0,0,fx.width,fx.height);
+      for(const p of ps){ p.vy+=0.02; p.vx*=0.995; p.vy*=0.995; p.x+=p.vx; p.y+=p.vy;
+        ctx.globalAlpha=Math.max(0,1-dt/p.life); ctx.fillStyle=p.col;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha=1; if(dt<dur) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function celebrate(){
+    const r=document.getElementById('panel').getBoundingClientRect();
+    burst(r.left+r.width/2, r.top+r.height/2, 160, 3000);
+    setTimeout(()=>burst(innerWidth*0.25, innerHeight*0.35, 120, 3000), 1000);
+    setTimeout(()=>burst(innerWidth*0.75, innerHeight*0.35, 120, 3000), 2000);
   }
 
-  document.getElementById('panel').onclick=()=>{if(!drawBtn.disabled)drawBtn.click();};
-  drawBtn.onclick=()=>{if(spinning)return;drawBtn.disabled=true;bigResult.textContent='...';spinTo(randomDraw());};
-  resetBtn.onclick=()=>{[wheelH,wheelT,wheelO].forEach(w=>{const s=w.querySelector('.digit-strip');s.style.transition='none';s.style.transform='translate3d(0,0,0)';});bigResult.textContent='—';spinning=false;drawBtn.disabled=false;};
+  /* ===== 유틸 ===== */
+  const digitHeight = () => document.querySelector('.digit').getBoundingClientRect().height;
 
-  function init(){applyH();markCurrent(wheelH);markCurrent(wheelT);markCurrent(wheelO);}
-  window.onload=init;window.onresize=init;
+  // 긴 스트립(사라짐 방지)
+  const STRIP_REP = 40; // 40바퀴 분량
+  function buildStrip(wheel){
+    const strip = wheel.querySelector('.digit-strip'); strip.innerHTML='';
+    for(let r=0;r<STRIP_REP;r++){
+      for(let d=0; d<10; d++){
+        const el=document.createElement('div'); el.className='digit'; el.textContent=d; strip.appendChild(el);
+      }
+    }
+  }
+  wheels.forEach(buildStrip);
+
+  // 보기 높이(3칸)
+  function applyViewport(){
+    const h = digitHeight();
+    document.documentElement.style.setProperty('--digitH', `${h}px`);
+    wheels.forEach(w => { w.style.height = `${h*3}px`; });
+  }
+
+  // 회전/정지 파라미터
+  const baseLen = 10;
+  const VISIBLE_REP = 4;  // 가운데 정렬 기준 반복
+  const TARGET_REP  = 20; // 목표 기준 반복
+  const EASE = 'cubic-bezier(.08,.72,.12,.99)';
+
+  // ★ 바퀴별 회전 시간/회전 수(백 → 십 → 일 순서로 더 오래)
+  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;  // 추가 회전수
+  const SPIN_H  = 6000, SPIN_T = 7000, SPIN_O = 8000; // ms
+  const MAX_TARGET_INDEX = STRIP_REP*baseLen - baseLen*2; // 끝 여유 2바퀴
+
+  function visibleBaseIndex(digit){ return VISIBLE_REP*baseLen + (digit - 1); }
+
+  function moveToIndex(wheel, index, duration){
+    return new Promise(res=>{
+      const strip=wheel.querySelector('.digit-strip');
+      strip.style.transition = `transform ${duration}ms ${EASE}`;
+      requestAnimationFrame(()=>{ strip.style.transform=`translate3d(0, ${-index*digitHeight()}px, 0)`; });
+      strip.addEventListener('transitionend', ()=>res(), {once:true});
+    });
+  }
+
+  function markCurrent(wheel){
+    const strip = wheel.querySelector('.digit-strip');
+    const centerY = wheel.getBoundingClientRect().top + wheel.getBoundingClientRect().height/2;
+    const digits = [...strip.children];
+    let best=null, bestDist=1e9;
+    for(const d of digits){
+      const r=d.getBoundingClientRect(), mid=r.top+r.height/2;
+      const dist=Math.abs(mid-centerY);
+      if(dist<bestDist){ bestDist=dist; best=d; }
+      d.classList.remove('current');
+    }
+    if(best) best.classList.add('current');
+  }
+
+  function setInstant(wheel, digit){
+    const strip=wheel.querySelector('.digit-strip'); strip.style.transition='none';
+    strip.style.transform=`translate3d(0, ${-visibleBaseIndex(digit)*digitHeight()}px, 0)`;
+    markCurrent(wheel);
+  }
+
+  async function spinToDigit(wheel, digit, extraLoops, duration){
+    // 스핀 중 current 해제
+    wheel.querySelectorAll('.digit').forEach(d=>d.classList.remove('current'));
+    // 충분히 긴 목표 인덱스(끝 여유 확보)
+    const raw = (TARGET_REP + extraLoops) * baseLen + (digit - 1);
+    const targetIdx = Math.min(raw, MAX_TARGET_INDEX);
+    await moveToIndex(wheel, targetIdx, duration);
+    // 재정렬 + 중앙 강조
+    const strip=wheel.querySelector('.digit-strip');
+    strip.style.transition='none';
+    strip.style.transform=`translate3d(0, ${-visibleBaseIndex(digit)*digitHeight()}px, 0)`;
+    markCurrent(wheel);
+  }
+
+  // 숫자 관련
+  function split(n){ n=Math.max(1,Math.min(100,Math.round(n))); return [Math.floor(n/100), Math.floor((n%100)/10), n%10]; }
+  function randomDraw(){ return Math.floor(Math.random()*100)+1; }
+  const pad3 = n => n===100 ? "100" : String(n).padStart(3,'0');
+
+  // 기록
+  const history=[];
+  function renderHistory(){
+    rowsEl.innerHTML='';
+    history.forEach((v,i)=>{
+      const row=document.createElement('div'); row.className='row';
+      row.innerHTML = `<span>${v}</span><span class="idx">#${i+1}</span>`;
+      rowsEl.appendChild(row);
+    });
+    rowsEl.scrollTop = rowsEl.scrollHeight;
+  }
+  function addHistory(n){ history.push(n); if(history.length>300) history.shift(); renderHistory(); }
+  clearHistoryBtn.onclick=()=>{ history.length=0; renderHistory(); };
+
+  // 메인 로직
+  let spinning=false;
+  async function spinTo(n){
+    if(spinning) return; spinning=true;
+    n=Math.max(1,Math.min(100,n));
+    const [h,t,o]=split(n);
+
+    // 1..100 표현: 백의자리는 n==100 ? 1 : 0 에 멈춘다
+    const digitH = (n===100?1:0);
+    const digitT = (n===100?0:t);
+    const digitO = (n===100?0:o);
+
+    // ★ 백 → 십 → 일 순서로 더 오래 돌고 늦게 멈춤
+    await Promise.all([
+      spinToDigit(wheelH, digitH, EXTRA_H, SPIN_H),               // 먼저 멈춤
+      (async()=>{ await new Promise(r=>setTimeout(r,120)); await spinToDigit(wheelT, digitT, EXTRA_T, SPIN_T); })(),
+      (async()=>{ await new Promise(r=>setTimeout(r,240)); await spinToDigit(wheelO, digitO, EXTRA_O, SPIN_O); })(),
+    ]);
+
+    bigResult.textContent = pad3(n);
+    addHistory(n);
+    celebrate();
+    spinning=false; drawBtn.disabled=false;
+  }
+
+  // 바인딩
+  document.getElementById('panel').onclick = () => { if(!drawBtn.disabled) drawBtn.click(); };
+  drawBtn.onclick = () => { if(spinning) return; drawBtn.disabled=true; bigResult.textContent='...'; spinTo(randomDraw()); };
+  resetBtn.onclick = () => { [wheelH,wheelT,wheelO].forEach(w=>setInstant(w,0)); bigResult.textContent='—'; spinning=false; drawBtn.disabled=false; };
+
+  // 초기화
+  function init(){ applyViewport(); setInstant(wheelH,0); setInstant(wheelT,0); setInstant(wheelO,0); }
+  window.addEventListener('load', init);
+  window.addEventListener('resize', init);
 })();
 </script>
 </body>
 </html>
-
