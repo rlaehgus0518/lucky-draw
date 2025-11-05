@@ -10,23 +10,21 @@
     --rowh:48px; /* 기록 한 줄 높이 */
   }
   html,body{height:100%;margin:0;font-family:Inter,system-ui,Apple SD Gothic Neo,"Malgun Gothic",sans-serif;background:#07122a;color:var(--text);}
-  .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;box-sizing:border-box;flex-direction:column;gap:22px}
+  .wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:22px;padding:32px;box-sizing:border-box}
   .title{font-size:42px;font-weight:900;letter-spacing:1px;color:#e8edf7;text-shadow:0 4px 20px rgba(0,0,0,.45)}
 
-  /* 메인 레이아웃: 가운데(추첨기+큰결과), 오른쪽(기록) */
+  /* 중앙에 추첨기만 배치 */
   .stage{
     width:100%; max-width:1200px;
-    background:linear-gradient(180deg,#081226 0%, #0f1a2b 100%);
-    border-radius:14px;padding:28px; box-shadow:0 10px 30px rgba(2,6,23,0.6);
-    display:grid; grid-template-columns: 1fr 380px; gap:28px; align-items:start;
+    display:flex; justify-content:center; align-items:flex-start;
+    position:relative;
   }
-
-  /* 중앙 스택 */
   .centerStack{display:flex;flex-direction:column;gap:16px;align-items:center}
 
   /* 롤링 패널 */
   .panel{width:520px;max-width:90vw;border-radius:12px;background:linear-gradient(180deg,#071a2b,#052036);
-    display:flex;align-items:center;justify-content:center;padding:18px 20px;box-sizing:border-box;position:relative;overflow:hidden}
+    display:flex;align-items:center;justify-content:center;padding:18px 20px;box-sizing:border-box;position:relative;overflow:hidden;
+    box-shadow:0 10px 30px rgba(2,6,23,0.6)}
   .panel:before{content:"";position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 6px 30px rgba(0,0,0,0.6)}
   .display{display:flex;gap:12px;align-items:center;z-index:2}
 
@@ -38,15 +36,14 @@
   .digit-strip{position:absolute;top:0;left:0;right:0;display:block;transform:translateY(0);will-change:transform}
   .digit{height:48px;line-height:48px;text-align:center;font-weight:800;font-size:44px;color:var(--accent);text-shadow:0 2px 8px rgba(0,0,0,0.6)}
 
-  /* 상/하 페이드로 가운데 강조 */
   .wheel::before,.wheel::after{content:"";position:absolute;left:0;right:0;height:28%;pointer-events:none}
   .wheel::before{top:0;background:linear-gradient(to bottom, rgba(7,18,42,.85), rgba(7,18,42,0))}
   .wheel::after{bottom:0;background:linear-gradient(to top, rgba(7,18,42,.85), rgba(7,18,42,0))}
 
-  /* 슬롯머신 네모 프레임(가운데 한 칸에 얹힘) */
+  /* 슬롯머신 중앙 프레임 */
   .focus-frame{
     position:absolute; left:8px; right:8px; margin:auto;
-    height:calc(var(--digitH, 48px)); /* JS로 실제 숫자 높이 반영 */
+    height:calc(var(--digitH, 48px));
     border:3px solid rgba(255,209,102,.9); border-radius:10px;
     box-shadow:0 0 16px rgba(255,209,102,.25), inset 0 0 8px rgba(255,209,102,.25);
     pointer-events:none;
@@ -54,26 +51,31 @@
 
   /* 버튼 + 큰 결과 */
   .actions{display:flex;gap:10px}
-  .btn{background:transparent;border:1px solid rgba(255,255,255,0.08);padding:12px 18px;border-radius:12px;color:var(--text);cursor:pointer;font-weight:800}
+  .btn{background:transparent;border:1px solid rgba(255,255,255,0.08);padding:12px 18px;border-radius:12px;color:#var(--text);cursor:pointer;font-weight:800;color:var(--text)}
   .btn.primary{background:var(--accent);color:#081022;border:0}
   .btn:active{transform:translateY(1px)}
-
   .big-result-wrap{width:520px;max-width:90vw;background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 16px}
-  .big-result-title{font-size:13px;color:#d7deef;margin:0 0 6px 0}
+  .big-result-title{font-size:13px;color:#d7deef;margin:0 0 6px 0;text-align:center}
   .big-result{font-size:112px;line-height:1;font-weight:1000;letter-spacing:4px;color:#ffe08a;text-shadow:0 6px 24px rgba(0,0,0,.5);text-align:center}
 
-  /* 오른쪽 기록(3줄만 보이고 스크롤) */
-  .history{background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px;max-height:560px}
-  .history h4{margin:0 0 10px 0;font-size:14px;color:#d7deef;text-align:right}
-  .rows{display:flex;flex-direction:column;gap:8px;overflow:auto;max-height:calc(var(--rowh)*3 + 16px);}
+  /* === 오른쪽 끝 고정 기록 박스 === */
+  .historyDock{
+    position:fixed; right:24px; top:140px; width:360px;
+    background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);
+    border-radius:12px;padding:12px; backdrop-filter:blur(2px);
+    box-shadow:0 10px 30px rgba(2,6,23,.6);
+  }
+  .historyDock h4{margin:0 0 10px 0;font-size:14px;color:#d7deef;text-align:right}
+  .rows{display:flex;flex-direction:column;gap:8px;overflow:auto;max-height:calc(var(--rowh)*6 + 16px);}
   .row{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.06);border-radius:10px;padding:10px 12px;font-size:20px;height:var(--rowh)}
   .row .idx{font-size:12px;color:#b9c2d8;letter-spacing:.5px}
   .clear-line{display:flex;justify-content:flex-end;margin-top:10px}
   .clear{font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#dbe3f9}
 
-  @media (max-width:860px){
-    .stage{grid-template-columns: 1fr;}
-    .history h4{text-align:left}
+  @media (max-width:980px){
+    .historyDock{position:static;width:100%;right:auto;top:auto;margin-top:18px}
+    .historyDock h4{text-align:left}
+    .wrap{padding:18px}
   }
   @media (max-width:640px){
     .wheel{width:90px} .digit{font-size:36px;height:44px;line-height:44px}
@@ -93,18 +95,9 @@
     <div class="centerStack">
       <div class="panel" id="panel">
         <div class="display">
-          <div class="wheel" data-pos="h">
-            <div class="digit-strip"></div>
-            <div class="focus-frame"></div>
-          </div>
-          <div class="wheel" data-pos="t">
-            <div class="digit-strip"></div>
-            <div class="focus-frame"></div>
-          </div>
-          <div class="wheel" data-pos="o">
-            <div class="digit-strip"></div>
-            <div class="focus-frame"></div>
-          </div>
+          <div class="wheel" data-pos="h"><div class="digit-strip"></div><div class="focus-frame"></div></div>
+          <div class="wheel" data-pos="t"><div class="digit-strip"></div><div class="focus-frame"></div></div>
+          <div class="wheel" data-pos="o"><div class="digit-strip"></div><div class="focus-frame"></div></div>
         </div>
       </div>
 
@@ -118,14 +111,14 @@
         <div id="bigResult" class="big-result">—</div>
       </div>
     </div>
-
-    <!-- 오른쪽: 기록 박스(오래된 값이 아래) -->
-    <div class="history">
-      <h4>추첨 기록</h4>
-      <div class="rows" id="historyRows"></div>
-      <div class="clear-line"><button class="clear" id="clearHistoryBtn">기록 비우기</button></div>
-    </div>
   </div>
+
+  <!-- 오른쪽 끝: 기록 (6줄 보이고 스크롤) -->
+  <aside class="historyDock">
+    <h4>추첨 기록</h4>
+    <div class="rows" id="historyRows"></div>
+    <div class="clear-line"><button class="clear" id="clearHistoryBtn">기록 비우기</button></div>
+  </aside>
 </div>
 
 <script>
@@ -167,7 +160,7 @@
     setTimeout(()=>burst(innerWidth*0.75, innerHeight*0.35, 120, 3000), 2000);
   }
 
-  // 숫자 실측 높이
+  // 숫자 높이
   const digitHeight = () => document.querySelector('.digit').getBoundingClientRect().height;
 
   // 휠 구성: 0~9
@@ -182,7 +175,7 @@
   // 3칸 보기
   function applyViewportHeight(){
     const h = digitHeight();
-    document.documentElement.style.setProperty('--digitH', `${h}px`); // focus-frame 높이 세팅
+    document.documentElement.style.setProperty('--digitH', `${h}px`);
     wheels.forEach(w => { w.style.height = `${h*3}px`; });
   }
 
@@ -214,12 +207,12 @@
     });
   }
 
-  function split(n){ n=Math.max(1,Math.min(MAX,Math.round(n))); return [Math.floor(n/100), Math.floor((n%100)/10), n%10]; }
-  function randomDraw(){ return Math.floor(Math.random()*MAX)+1; } // 1..100
+  function split(n){ n=Math.max(1,Math.min(100,Math.round(n))); return [Math.floor(n/100), Math.floor((n%100)/10), n%10]; }
+  function randomDraw(){ return Math.floor(Math.random()*100)+1; }
   const pad3 = n => (n===100 ? "100" : String(n).padStart(3,'0'));
 
-  // 기록(오래된 값이 아래) – push로 아래에 쌓고, 3줄만 보이게 컨테이너는 CSS로 제한
-  const history=[]; 
+  // 기록(오래된 값이 아래) – 컨테이너가 6줄만 보이도록 제한
+  const history=[];
   function renderHistory(){
     rowsEl.innerHTML='';
     history.forEach((v,i)=>{
@@ -228,7 +221,7 @@
       const idx=document.createElement('span'); idx.className='idx'; idx.textContent=`#${i+1}`;
       row.appendChild(left); row.appendChild(idx); rowsEl.appendChild(row);
     });
-    rowsEl.scrollTop = rowsEl.scrollHeight; // 항상 아래로
+    rowsEl.scrollTop = rowsEl.scrollHeight;
   }
   function addHistory(n){ history.push(n); if(history.length>300) history.shift(); renderHistory(); }
   clearHistoryBtn.addEventListener('click', ()=>{ history.length=0; renderHistory(); });
@@ -236,13 +229,9 @@
   let spinning=false;
   async function spinTo(n){
     if(spinning) return; spinning=true;
-    n=Math.max(1,Math.min(MAX,n));
+    n=Math.max(1,Math.min(100,n));
     const [h,t,o]=split(n);
-
-    // 결과는 1..100로 고정: 백의자리는 n==100 ? 1 : 0 에 멈춤
-    const targetH = (n===100?1:0);
-    const targetT = (n===100?0:t);
-    const targetO = (n===100?0:o);
+    const targetH = (n===100?1:0), targetT = (n===100?0:t), targetO = (n===100?0:o);
 
     const pH=spinToDigit(wheelH, targetH, 6, 1700);
     const pT=spinToDigit(wheelT, targetT, 7, 1850);
