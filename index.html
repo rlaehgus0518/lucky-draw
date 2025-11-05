@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>랜덤 추첨기 (1~100)</title>
+<title>Lucky Draw</title>
 <style>
   :root{
     --panel:#0f1724;
@@ -13,7 +13,7 @@
   }
   html,body{height:100%;margin:0;font-family:Inter,system-ui,Apple SD Gothic Neo,"Malgun Gothic",sans-serif;background:#07122a;color:var(--text);}
   .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;box-sizing:border-box;flex-direction:column;gap:22px}
-  .title{font-size:20px;letter-spacing:1px;color:#cfd6e6}
+  .title{font-size:24px;letter-spacing:1px;color:#cfd6e6;font-weight:800}
   .stage{background:linear-gradient(180deg,#081226 0%, #0f1a2b 100%);border-radius:14px;padding:28px;box-shadow:0 10px 30px rgba(2,6,23,0.6);display:flex;align-items:center;gap:18px}
 
   /* display panel */
@@ -43,16 +43,14 @@
   }
 
   /* fireworks canvas */
-  #fx {
-    position:fixed; inset:0; pointer-events:none; z-index:50;
-  }
+  #fx { position:fixed; inset:0; pointer-events:none; z-index:50; }
 </style>
 </head>
 <body>
 <canvas id="fx"></canvas>
 
 <div class="wrap">
-  <div class="title">랜덤 추첨기 • 숫자 범위: 1 ~ 100</div>
+  <div class="title">Lucky Draw</div>
 
   <div class="stage">
     <div class="panel" id="panel">
@@ -98,19 +96,19 @@
   // 고정 높이(px) – CSS의 .digit 높이와 동일
   const DIGIT_H = 48;
 
-  // ===== fireworks (간단한 컨페티) =====
+  // ==== fireworks (3초) ====
   const fx = document.getElementById('fx');
   const ctx = fx.getContext('2d');
   function resizeFx(){ fx.width = innerWidth; fx.height = innerHeight; }
   addEventListener('resize', resizeFx); resizeFx();
 
-  function fireworksBurst(centerX, centerY, count=120, duration=1200){
+  function fireworksBurst(cx, cy, count=140, duration=3000){ // 3초
     const parts = [];
     for(let i=0;i<count;i++){
       const angle = Math.random()*Math.PI*2;
       const speed = 2 + Math.random()*5;
       parts.push({
-        x:centerX, y:centerY,
+        x:cx, y:cy,
         vx: Math.cos(angle)*speed,
         vy: Math.sin(angle)*speed,
         life: duration,
@@ -123,7 +121,6 @@
       const t = now - start;
       ctx.clearRect(0,0,fx.width,fx.height);
       parts.forEach(p=>{
-        // 중력/감속
         p.vy += 0.02;
         p.vx *= 0.995; p.vy *= 0.995;
         p.x += p.vx; p.y += p.vy;
@@ -142,15 +139,14 @@
   }
   function celebrate(){
     const rect = document.getElementById('panel').getBoundingClientRect();
-    fireworksBurst(rect.left + rect.width/2, rect.top + rect.height/2, 140, 1400);
-    setTimeout(()=>fireworksBurst(innerWidth*0.25, innerHeight*0.3, 100, 1200), 150);
-    setTimeout(()=>fireworksBurst(innerWidth*0.75, innerHeight*0.35, 100, 1200), 250);
+    fireworksBurst(rect.left + rect.width/2, rect.top + rect.height/2, 160, 3000);
+    setTimeout(()=>fireworksBurst(innerWidth*0.25, innerHeight*0.3, 120, 3000), 200);
+    setTimeout(()=>fireworksBurst(innerWidth*0.75, innerHeight*0.35, 120, 3000), 400);
   }
-  // ====================================
+  // ==========================
 
   function buildStrip(stripEl){
     stripEl.innerHTML = '';
-    // 0..9 반복 (스핀이 자연스럽게 보이게)
     for(let r=0;r<5;r++){
       for(let d=0;d<10;d++){
         const div = document.createElement('div');
@@ -170,7 +166,7 @@
     strip.style.transform = `translateY(${-idx * DIGIT_H}px)`;
   }
 
-  // transition 종료를 Promise로 반환 → 동기화 보장
+  // transition 종료를 Promise로
   function spinWheel(wheel, digit, loops, duration){
     return new Promise(resolve=>{
       const strip = wheel.querySelector('.digit-strip');
@@ -203,17 +199,31 @@
     return [hundreds, tens, ones];
   }
 
+  let spinning = false;       // 동시 클릭 방지
+  let currentValue = null;    // 이번 라운드 결과
+
   async function spinTo(n){
+    if (spinning) return;
+    spinning = true;
+    currentValue = n;
+
     const [h,t,o] = splitNumber(n);
     // 세 자리 모두 회전 (백의 자리도 항상 회전)
     const pH = spinWheel(wheelH, (n===100?1:0), 4, 1700);
     const pT = spinWheel(wheelT, t, 5, 1800);
     const pO = spinWheel(wheelO, o, 6, 2000);
 
-    await Promise.all([pH,pT,pO]); // 모두 멈출 때까지 대기
-    resultText.textContent = String(n); // 결과와 화면 동기화
+    await Promise.all([pH,pT,pO]);
+
+    // ✅ 최종 강제 정렬(표시값과 결과 100% 동기화)
+    setWheelInstant(wheelH, (n===100?1:0));
+    setWheelInstant(wheelT, t);
+    setWheelInstant(wheelO, o);
+
+    resultText.textContent = String(n);
+    celebrate();
+    spinning = false;
     drawBtn.disabled = false;
-    celebrate(); // 폭죽!
   }
 
   function randomDraw(){
@@ -225,6 +235,7 @@
   });
 
   drawBtn.addEventListener('click', () => {
+    if (spinning) return;
     drawBtn.disabled = true;
     resultText.textContent = '...';
     const val = randomDraw();
@@ -237,6 +248,8 @@
     setWheelInstant(wheelO, 0);
     resultText.textContent = '—';
     drawBtn.disabled = false;
+    spinning = false;
+    currentValue = null;
   });
 
   window.addEventListener('load', () => {
