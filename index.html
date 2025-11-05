@@ -9,34 +9,46 @@
   html,body{height:100%;margin:0;font-family:Inter,system-ui,Apple SD Gothic Neo,"Malgun Gothic",sans-serif;background:#07122a;color:var(--text);}
   .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;box-sizing:border-box;flex-direction:column;gap:22px}
   .title{font-size:42px;font-weight:900;letter-spacing:1px;color:#e8edf7;text-shadow:0 4px 20px rgba(0,0,0,.45)}
-  .stage{background:linear-gradient(180deg,#081226 0%, #0f1a2b 100%);border-radius:14px;padding:28px;box-shadow:0 10px 30px rgba(2,6,23,0.6);display:flex;align-items:flex-start;gap:24px}
 
-  /* 패널(롤링) */
+  /* 메인 영역: 좌측 롤링, 우측(맨 오른쪽) 기록 */
+  .stage{
+    width:100%; max-width:1200px;
+    background:linear-gradient(180deg,#081226 0%, #0f1a2b 100%);
+    border-radius:14px;padding:28px;
+    box-shadow:0 10px 30px rgba(2,6,23,0.6);
+    display:grid; grid-template-columns: 520px 1fr 380px; gap:24px; align-items:start;
+  }
+
+  /* 롤링 패널 */
   .panel{width:520px;border-radius:10px;background:linear-gradient(180deg,#071a2b,#052036);display:flex;align-items:center;justify-content:center;padding:18px 20px;box-sizing:border-box;position:relative;overflow:hidden}
   .panel:before{content:"";position:absolute;inset:0;border-radius:10px;box-shadow:inset 0 6px 30px rgba(0,0,0,0.6)}
   .display{display:flex;gap:10px;align-items:center;z-index:2}
-  .wheel{width:120px;background:linear-gradient(180deg,#0a2736,#06202c);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;border:2px solid rgba(255,255,255,0.03)}
+  .wheel{
+    width:120px;background:linear-gradient(180deg,#0a2736,#06202c);
+    border-radius:8px;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;position:relative;border:2px solid rgba(255,255,255,0.03)
+  }
   .digit-strip{position:absolute;top:0;left:0;right:0;display:block;transform:translateY(0);will-change:transform}
   .digit{height:48px;line-height:48px;text-align:center;font-weight:800;font-size:44px;color:var(--accent);text-shadow:0 2px 8px rgba(0,0,0,0.6)}
-  .label{position:absolute;left:10px;top:10px;color:var(--muted);font-size:12px}
+  /* 상/하 페이드로 가운데 강조, 라벨은 제거 */
   .wheel::before,.wheel::after{content:"";position:absolute;left:0;right:0;height:28%;pointer-events:none}
   .wheel::before{top:0;background:linear-gradient(to bottom, rgba(7,18,42,.85), rgba(7,18,42,0))}
   .wheel::after{bottom:0;background:linear-gradient(to top, rgba(7,18,42,.85), rgba(7,18,42,0))}
 
-  /* 오른쪽 사이드(버튼 + 큰 결과 + 큰 기록) */
-  .side{display:flex;flex-direction:column;gap:14px;min-width:360px}
+  /* 가운데(결과/버튼) */
+  .centerCol{display:flex;flex-direction:column;gap:14px}
   .actions{display:flex;gap:10px}
   .btn{background:transparent;border:1px solid rgba(255,255,255,0.08);padding:12px 18px;border-radius:12px;color:var(--text);cursor:pointer;font-weight:800}
   .btn.primary{background:var(--accent);color:#081022;border:0}
   .btn:active{transform:translateY(1px)}
 
-  /* 큰 당첨 숫자 */
-  .big-result-wrap{background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:10px 14px}
-  .big-result-title{font-size:13px;color:#d7deef;margin:0 0 4px 0}
-  .big-result{font-size:86px;line-height:1;font-weight:1000;letter-spacing:2px;color:#ffe08a;text-shadow:0 6px 24px rgba(0,0,0,.5)}
+  .big-result-wrap{background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 16px}
+  .big-result-title{font-size:13px;color:#d7deef;margin:0 0 6px 0}
+  /* ★ 3자리 패딩 표시 크게 */
+  .big-result{font-size:112px;line-height:1;font-weight:1000;letter-spacing:4px;color:#ffe08a;text-shadow:0 6px 24px rgba(0,0,0,.5)}
 
-  /* 기록(큰 버전 / 오래된 값이 아래로) */
-  .history{background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px;max-height:420px;overflow:auto}
+  /* 맨 오른쪽 큰 기록 패널 (오래된 값이 아래) */
+  .history{background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px;max-height:560px;overflow:auto}
   .history h4{margin:0 0 8px 0;font-size:14px;color:#d7deef}
   .rows{display:flex;flex-direction:column;gap:8px}
   .row{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.06);border-radius:10px;padding:10px 12px;font-size:20px}
@@ -44,15 +56,13 @@
   .clear-line{display:flex;justify-content:flex-end;margin-top:8px}
   .clear{font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#dbe3f9}
 
-  @media (max-width:860px){
-    .side{min-width:260px}
-    .big-result{font-size:64px}
+  @media (max-width:1100px){
+    .stage{grid-template-columns: 1fr; }
   }
   @media (max-width:640px){
-    .panel{width:100%} .wheel{width:90px} .digit{font-size:36px;height:44px;line-height:44px}
-    .title{font-size:30px} .big-result{font-size:52px}
+    .wheel{width:90px} .digit{font-size:36px;height:44px;line-height:44px}
+    .title{font-size:30px} .big-result{font-size:72px}
   }
-
   #fx{position:fixed;inset:0;pointer-events:none;z-index:50}
 </style>
 </head>
@@ -63,32 +73,32 @@
   <div class="title">Lucky Draw</div>
 
   <div class="stage">
-    <!-- 롤링 패널 -->
+    <!-- 좌: 롤링 -->
     <div class="panel" id="panel">
       <div class="display">
-        <div class="wheel" data-pos="h"><div class="label">100s</div><div class="digit-strip"></div></div>
-        <div class="wheel" data-pos="t"><div class="label">10s</div><div class="digit-strip"></div></div>
-        <div class="wheel" data-pos="o"><div class="label">1s</div><div class="digit-strip"></div></div>
+        <div class="wheel" data-pos="h"><div class="digit-strip"></div></div>
+        <div class="wheel" data-pos="t"><div class="digit-strip"></div></div>
+        <div class="wheel" data-pos="o"><div class="digit-strip"></div></div>
       </div>
     </div>
 
-    <!-- 우측 큰 표시와 큰 기록 -->
-    <div class="side">
+    <!-- 가운데: 버튼 + 큰 결과 -->
+    <div class="centerCol">
       <div class="actions">
         <button class="btn primary" id="drawBtn">추첨</button>
         <button class="btn" id="resetBtn">Reset</button>
       </div>
-
       <div class="big-result-wrap">
         <p class="big-result-title">결과</p>
         <div id="bigResult" class="big-result">—</div>
       </div>
+    </div>
 
-      <div class="history">
-        <h4>추첨 기록 (오래된 값이 아래)</h4>
-        <div class="rows" id="historyRows"></div>
-        <div class="clear-line"><button class="clear" id="clearHistoryBtn">기록 비우기</button></div>
-      </div>
+    <!-- 우: 기록(맨 오른쪽) -->
+    <div class="history">
+      <h4>추첨 기록</h4>
+      <div class="rows" id="historyRows"></div>
+      <div class="clear-line"><button class="clear" id="clearHistoryBtn">기록 비우기</button></div>
     </div>
   </div>
 </div>
@@ -106,10 +116,9 @@
   const rowsEl = document.getElementById('historyRows');
   const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
-  /* ===== fireworks (3s each, 1s 간격 순차) ===== */
+  /* ===== fireworks (3s each, 1s 간격) ===== */
   const fx = document.getElementById('fx'); const ctx = fx.getContext('2d');
-  function resizeFx(){ fx.width = innerWidth; fx.height = innerHeight; }
-  addEventListener('resize', resizeFx); resizeFx();
+  function resizeFx(){ fx.width = innerWidth; fx.height = innerHeight; } addEventListener('resize', resizeFx); resizeFx();
   function burst(cx, cy, count=140, duration=3000){
     const ps=[]; for(let i=0;i<count;i++){ const a=Math.random()*Math.PI*2, s=2+Math.random()*5;
       ps.push({x:cx,y:cy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:duration,size:2+Math.random()*3,col:`hsl(${~~(Math.random()*360)},90%,60%)`});
@@ -132,16 +141,14 @@
     setTimeout(()=>burst(innerWidth*0.25, innerHeight*0.35, 120, 3000), 1000);
     setTimeout(()=>burst(innerWidth*0.75, innerHeight*0.35, 120, 3000), 2000);
   }
-  /* ============================================ */
 
-  // 숫자 실측 높이
+  // 숫자 높이
   const digitHeight = () => document.querySelector('.digit').getBoundingClientRect().height;
 
-  // 휠 구성: 백(0/1), 나머지(0~9)
+  // 휠 구성: ★ 이제 백의 자리도 0~9로 회전
   function buildStrip(wheel){
     const strip = wheel.querySelector('.digit-strip'); strip.innerHTML='';
-    const isH = wheel.dataset.pos === 'h';
-    const digits = isH ? [0,1] : [0,1,2,3,4,5,6,7,8,9];
+    const digits = [0,1,2,3,4,5,6,7,8,9];
     for(let r=0;r<10;r++){ for(const d of digits){
       const el=document.createElement('div'); el.className='digit'; el.textContent=d; strip.appendChild(el);
     }}
@@ -155,12 +162,12 @@
   }
 
   const VISIBLE_REP = 4, TARGET_REP = 6;
-  const baseLen = w => (w.dataset.pos==='h'?2:10);
+  const baseLen = 10; // 모든 바퀴 0~9
 
   function setInstant(wheel, digit){
     const strip=wheel.querySelector('.digit-strip'); strip.style.transition='none';
-    const h=digitHeight(); const len=baseLen(wheel);
-    const idx = VISIBLE_REP*len + digit;
+    const h=digitHeight();
+    const idx = VISIBLE_REP*baseLen + digit;
     const topIndex = idx - 1; // 가운데가 현재값
     strip.style.transform=`translate3d(0, ${-topIndex*h}px, 0)`;
   }
@@ -168,14 +175,14 @@
   function spinToDigit(wheel, digit, loops, duration){
     return new Promise(resolve=>{
       const strip=wheel.querySelector('.digit-strip');
-      const h=digitHeight(); const len=baseLen(wheel);
-      const idx = TARGET_REP*len + digit;
+      const h=digitHeight();
+      const idx = TARGET_REP*baseLen + digit;
       const topIndex = idx - 1;
-      const translateY = -((loops*len) + topIndex) * h;
+      const translateY = -((loops*baseLen) + topIndex) * h;
       strip.style.transition = `transform ${duration}ms cubic-bezier(.18,.82,.18,1)`;
       requestAnimationFrame(()=>{ strip.style.transform=`translate3d(0, ${translateY}px, 0)`; });
       const onEnd=()=>{ strip.style.transition='none';
-        const vIdx = VISIBLE_REP*len + digit, vTop = vIdx - 1;
+        const vIdx = VISIBLE_REP*baseLen + digit, vTop = vIdx - 1;
         strip.style.transform=`translate3d(0, ${-vTop*h}px, 0)`;
         strip.removeEventListener('transitionend', onEnd);
         resolve();
@@ -184,23 +191,24 @@
     });
   }
 
+  // 숫자 분해
   function split(n){ n=Math.max(1,Math.min(MAX,Math.round(n))); return [Math.floor(n/100), Math.floor((n%100)/10), n%10]; }
   function randomDraw(){ return Math.floor(Math.random()*MAX)+1; } // 1..100
+  const pad3 = n => (n===100 ? "100" : String(n).padStart(3,'0')); // 100은 100, 나머지 001~099
 
-  // 기록 (오래된 값이 아래)
-  const history = []; // push로 뒤에 추가 → 화면은 위에서 아래로 오래된 순
+  // 기록(오래된 값이 아래) – push로 아래에 쌓음
+  const history=[]; 
   function renderHistory(){
     rowsEl.innerHTML='';
     history.forEach((v,i)=>{
       const row=document.createElement('div'); row.className='row';
       const left=document.createElement('span'); left.textContent=String(v);
-      const idx=document.createElement('span'); idx.className='idx'; idx.textContent = `#${i+1}`;
-      row.appendChild(left); row.appendChild(idx);
-      rowsEl.appendChild(row);
+      const idx=document.createElement('span'); idx.className='idx'; idx.textContent=`#${i+1}`;
+      row.appendChild(left); row.appendChild(idx); rowsEl.appendChild(row);
     });
-    rowsEl.scrollTop = rowsEl.scrollHeight; // 항상 맨 아래(가장 오래된 쪽) 보이도록
+    rowsEl.scrollTop = rowsEl.scrollHeight;
   }
-  function addHistory(n){ history.push(n); if(history.length>200) history.shift(); renderHistory(); }
+  function addHistory(n){ history.push(n); if(history.length>300) history.shift(); renderHistory(); }
   clearHistoryBtn.addEventListener('click', ()=>{ history.length=0; renderHistory(); });
 
   let spinning=false;
@@ -208,20 +216,22 @@
     if(spinning) return; spinning=true;
     n=Math.max(1,Math.min(MAX,n));
     const [h,t,o]=split(n);
-    const targetH = (n===100?1:0), targetT = (n===100?0:t), targetO = (n===100?0:o);
 
+    // ★ 최종 정지값: 1..100만 허용 → 백의 자리는 n==100 ? 1 : 0 에 정지
+    const targetH = (n===100?1:0);
+    const targetT = (n===100?0:t);
+    const targetO = (n===100?0:o);
+
+    // 회전은 0~9로 시원하게 돌되 최종 고정만 위 규칙대로
     const pH=spinToDigit(wheelH, targetH, 6, 1700);
     const pT=spinToDigit(wheelT, targetT, 7, 1850);
     const pO=spinToDigit(wheelO, targetO, 8, 2050);
     await Promise.all([pH,pT,pO]);
 
-    // 최종 고정
     setInstant(wheelH, targetH); setInstant(wheelT, targetT); setInstant(wheelO, targetO);
 
-    // 큰 표시 + 기록
-    bigResult.textContent = String(n);
+    bigResult.textContent = pad3(n); // 094처럼 3자리로 크게
     addHistory(n);
-
     celebrate();
     spinning=false; drawBtn.disabled=false;
   }
