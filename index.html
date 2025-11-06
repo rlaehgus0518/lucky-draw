@@ -160,16 +160,16 @@
   const baseLen = 10;
   const VISIBLE_REP = 4;   // 가운데 정렬 기준 반복
   const TARGET_REP  = 20;  // 목표 기준 반복
-  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;    // 여분 회전수(항상 동일)
+  const EXTRA_H = 10, EXTRA_T = 12, EXTRA_O = 14;  // 연출용 여분 회전수
   const MAX_TARGET_INDEX = STRIP_REP*baseLen - baseLen*2;
 
   // 중앙 인덱스: (digit - 1) 보정
   function visibleBaseIndex(digit){ return VISIBLE_REP*baseLen + (digit - 1); }
 
-  // === EASING: 강한 감속(퀸트) ===
+  // EASING(감속): quint
   const easeOutQuint = t => 1 - Math.pow(1 - t, 5);
 
-  // ★ rAF 기반 감속 애니메이션
+  // rAF 기반 감속 애니메이션 (duration 고정)
   function animateToIndex(wheel, endIndex, duration){
     return new Promise(res=>{
       const strip = wheel.querySelector('.digit-strip');
@@ -188,7 +188,7 @@
 
       function frame(now){
         const raw = Math.min(1, (now - startT) / duration); // 0..1
-        const p = easeOutQuint(raw);                         // 감속
+        const p = easeOutQuint(raw);
         const y = startY + (endY - startY) * p;
         strip.style.transition = 'none';
         strip.style.transform = `translate3d(0, ${y}px, 0)`;
@@ -251,7 +251,7 @@
   clearHistoryBtn.onclick=()=>{ history.length=0; renderHistory(); };
 
   // 메인 로직
-  const SPIN_DUR = 3000; // 각 자리 3초 (고정)
+  const TOTAL_SPIN = 3000; // ★ 세 자리 동시에 3초
   let spinning=false;
   async function spinTo(n){
     if(spinning) return; spinning=true;
@@ -265,10 +265,12 @@
     const digitT = (n===100?0:t);
     const digitO = (n===100?0:o);
 
-    // 순차 진행: 백(3s) → 십(3s) → 일(3s)
-    await spinToDigit(wheelH, digitH, EXTRA_H, SPIN_DUR);
-    await spinToDigit(wheelT, digitT, EXTRA_T, SPIN_DUR);
-    await spinToDigit(wheelO, digitO, EXTRA_O, SPIN_DUR);
+    // ★ 동시에 시작 → 모두 3초 동안 감속 후 정지
+    await Promise.all([
+      spinToDigit(wheelH, digitH, EXTRA_H, TOTAL_SPIN),
+      spinToDigit(wheelT, digitT, EXTRA_T, TOTAL_SPIN),
+      spinToDigit(wheelO, digitO, EXTRA_O, TOTAL_SPIN),
+    ]);
 
     bigResult.textContent = pad3(n);
     addHistory(n);
