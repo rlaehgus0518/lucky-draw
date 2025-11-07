@@ -44,7 +44,7 @@
   .big-result-wrap{width:520px;max-width:90vw;background:rgba(10,20,35,.55);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 16px;margin-top:12px;}
   .big-result{text-align:center;font-size:112px;font-weight:1000;color:#ffe08a;text-shadow:0 6px 24px rgba(0,0,0,.5)}
   .range-set{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:18px;}
-  input{width:90px;padding:6px 8px;border-radius:6px;border:none;text-align:center;font-size:16px;}
+  input{width:100px;padding:6px 8px;border-radius:6px;border:none;text-align:center;font-size:16px;}
 </style>
 </head>
 <body>
@@ -89,71 +89,132 @@
   const minInput=document.getElementById('minInput');
   const maxInput=document.getElementById('maxInput');
 
-  const STRIP_REP=40;
+  /* ===== 스트립 구성 ===== */
+  const STRIP_REP=40, baseLen=10;
   function buildStrip(wheel){
     const strip=wheel.querySelector('.digit-strip'); strip.innerHTML='';
-    for(let r=0;r<STRIP_REP;r++)for(let d=0;d<10;d++){
-      const el=document.createElement('div');
-      el.className='digit'; el.textContent=d; strip.appendChild(el);
+    for(let r=0;r<STRIP_REP;r++) for(let d=0; d<10; d++){
+      const el=document.createElement('div'); el.className='digit'; el.textContent=d; strip.appendChild(el);
     }
   }
   wheels.forEach(buildStrip);
-  const digitHeight=()=>Math.round(document.querySelector('.digit').getBoundingClientRect().height);
-  const VISIBLE_REP=4; const TARGET_REP=20; const baseLen=10;
-  function visibleBaseIndex(d){return VISIBLE_REP*baseLen+(d-1);}
 
-  const easeOutQuint=t=>1-Math.pow(1-t,5);
-  const animateToIndex=(wheel,endIndex,duration)=>new Promise(res=>{
-    const strip=wheel.querySelector('.digit-strip');
-    const cur=getComputedStyle(strip).transform;
-    let startY=0;if(cur&&cur!=='none'){const m=cur.match(/matrix.*\((.+)\)/);if(m){const p=m[1].split(',');startY=parseFloat(p[5])||0;}}
-    const endY=-endIndex*digitHeight(),start=performance.now();
-    const step=now=>{
-      const t=Math.min(1,(now-start)/duration),p=easeOutQuint(t);
-      const y=startY+(endY-startY)*p;
-      strip.style.transform=`translate3d(0,${y}px,0)`;
-      if(t<1)requestAnimationFrame(step); else res();
-    };
-    requestAnimationFrame(step);
-  });
-  function setInstant(wheel,d){
+  /* ===== 높이/뷰포트 세팅 (핵심) ===== */
+  const digitHeight=()=>Math.round(document.querySelector('.digit').getBoundingClientRect().height);
+  function applyViewport(){
+    const h=digitHeight();
+    document.documentElement.style.setProperty('--digitH', `${h}px`);
+    wheels.forEach(w => { w.style.height = `${h*3}px`; }); // ★ 바퀴 높이 고정
+  }
+
+  /* ===== 인덱스 계산 ===== */
+  const VISIBLE_REP=4, TARGET_REP=20;
+  const MAX_TARGET_INDEX = STRIP_REP*baseLen - baseLen*2; // 끝에서 2바퀴 여유
+  const visibleBaseIndex = (digit) => VISIBLE_REP*baseLen + (digit - 1);
+
+  /* ===== 감속 이징 ===== */
+  const easeOutQuint = t => 1 - Math.pow(1 - t, 5);
+
+  /* ===== 안전한 transform 파서 ===== */
+  function getTranslateY(el){
+    const tr = getComputedStyle(el).transform;
+    if(!tr || tr==='none') return 0;
+    if(tr.startsWith('matrix3d(')){
+      const p = tr.slice(9,-1).split(',').map(Number);
+      return p[13] || 0; // matrix3d ty
+    }else if(tr.startsWith('matrix(')){
+      const p = tr.slice(7,-1).split(',').map(Number);
+      return p[5] || 0;  // matrix ty
+    }
+    return 0;
+  }
+
+  /* ===== rAF 감속 애니메이션 ===== */
+  function animateToIndex(wheel, endIndex, duration){
+    return new Promise(res=>{
+      const strip = wheel.querySelector('.digit-strip');
+      const startY = getTranslateY(strip);
+      const endY = -endIndex * digitHeight();
+      const start = performance.now();
+      const step = now => {
+        const t = Math.min(1, (now - start)/duration);
+        const p = easeOutQuint(t);
+        const y = startY + (endY - startY)*p;
+        strip.style.transition='none';
+        strip.style.transform=`translate3d(0, ${y}px, 0)`;
+        if(t<1) requestAnimationFrame(step); else res();
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  function setInstant(wheel,digit){
     const strip=wheel.querySelector('.digit-strip');
     strip.style.transition='none';
-    strip.style.transform=`translate3d(0,${-visibleBaseIndex(d)*digitHeight()}px,0)`;
+    strip.style.transform=`translate3d(0, ${-visibleBaseIndex(digit)*digitHeight()}px, 0)`;
   }
 
-  async function spinToDigit(wheel,digit,extra,dur){
-    const raw=(TARGET_REP+extra)*baseLen+(digit-1);
-    await animateToIndex(wheel,raw,dur);
+  async function spinToDigit(wheel, digit, extraLoops, duration){
+    const raw = (TARGET_REP + extraLoops) * baseLen + (digit - 1);
+    const targetIdx = Math.min(raw, MAX_TARGET_INDEX); // ★ 안전 클램프
+    await animateToIndex(wheel, targetIdx, duration);
+    // 스냅(정확 중앙)
     const strip=wheel.querySelector('.digit-strip');
-    strip.style.transform=`translate3d(0,${-visibleBaseIndex(digit)*digitHeight()}px,0)`;
+    strip.style.transition='none';
+    strip.style.transform=`translate3d(0, ${-visibleBaseIndex(digit)*digitHeight()}px, 0)`;
   }
 
-  const EXTRA_H=10,EXTRA_T=12,EXTRA_O=14,SPIN_TIME=3000;
+  /* ===== 범위 랜덤 ===== */
+  function getRandomInRange(min,max){
+    min = Math.floor(isFinite(min)?min:1);
+    max = Math.floor(isFinite(max)?max:100);
+    if(min>=max) max=min+1;
+    return Math.floor(Math.random()*(max-min+1))+min;
+  }
+
+  /* ===== 메인 로직: 3자리 동시에 3초 ===== */
+  const EXTRA_H=10, EXTRA_T=12, EXTRA_O=14;
+  const TOTAL_SPIN=3000;
   let spinning=false;
+
   async function spinTo(n){
-    if(spinning)return;spinning=true;drawBtn.disabled=true;
-    const h=Math.floor(n/100),t=Math.floor((n%100)/10),o=n%10;
+    if(spinning) return; spinning=true; drawBtn.disabled=true;
+    n = Math.max(0, Math.min(999, Math.round(n)));
+    const h = Math.floor(n/100), t = Math.floor((n%100)/10), o = n%10;
+    const dH = (n===100?1:h); // 1..100 표현 유지
+    const dT = (n===100?0:t);
+    const dO = (n===100?0:o);
+
     await Promise.all([
-      spinToDigit(wheelH,n===100?1:h,EXTRA_H,SPIN_TIME),
-      spinToDigit(wheelT,n===100?0:t,EXTRA_T,SPIN_TIME),
-      spinToDigit(wheelO,n===100?0:o,EXTRA_O,SPIN_TIME)
+      spinToDigit(wheelH, dH, EXTRA_H, TOTAL_SPIN),
+      spinToDigit(wheelT, dT, EXTRA_T, TOTAL_SPIN),
+      spinToDigit(wheelO, dO, EXTRA_O, TOTAL_SPIN),
     ]);
-    bigResult.textContent=n;
-    spinning=false;drawBtn.disabled=false;
+
+    bigResult.textContent = String(n);
+    spinning=false; drawBtn.disabled=false;
   }
 
+  /* ===== 바인딩 ===== */
   drawBtn.onclick=()=>{
-    let min=parseInt(minInput.value)||1;
-    let max=parseInt(maxInput.value)||100;
-    if(min>=max){max=min+1;}
-    const rand=Math.floor(Math.random()*(max-min+1))+min;
+    const min = parseFloat(minInput.value);
+    const max = parseFloat(maxInput.value);
+    const target = getRandomInRange(min,max);
     bigResult.textContent='...';
-    spinTo(rand);
+    spinTo(target);
   };
-  resetBtn.onclick=()=>{[wheelH,wheelT,wheelO].forEach(w=>setInstant(w,0));bigResult.textContent='—';};
+  resetBtn.onclick=()=>{
+    [wheelH,wheelT,wheelO].forEach(w=>setInstant(w,0));
+    bigResult.textContent='—';
+  };
 
-  window.onload=()=>{[wheelH,wheelT,wheelO].forEach(w=>setInstant(w,0));};
+  /* ===== 초기화 ===== */
+  function init(){
+    applyViewport();
+    [wheelH,wheelT,wheelO].forEach(w=>setInstant(w,0));
+  }
+  window.addEventListener('load', init);
+  window.addEventListener('resize', init);
 })();
 </script>
 </body>
